@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>離島鎮守府 脱出行</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{background:#111;color:#eee;font-family:sans-serif;margin:0;padding:0}
+#log{padding:15px;height:45vh;overflow-y:auto;border-bottom:1px solid #444}
+#status{padding:10px;font-size:14px;background:#222}
+#commands{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:10px}
+button{padding:10px;background:#333;color:white;border:none;border-radius:5px}
+button:active{background:#555}
+</style>
+</head>
+<body>
+
+<div id="log"></div>
+<div id="status"></div>
+<div id="commands"></div>
+
+<script>
+let state={
+turn:0,
+alert:0,
+fuel:0,
+location:"hq",
+relationships:[],
+caught:false,
+escaped:false
+};
+
+const crew=["時雨","朝潮","霞","金剛","響","雷","高雄","初月","浦風"];
+
+function log(text){
+document.getElementById("log").innerHTML+=text+"<br>";
+document.getElementById("log").scrollTop=99999;
+}
+
+function updateStatus(){
+document.getElementById("status").innerHTML=
+"ターン:"+state.turn+
+" | 警戒:"+state.alert+
+" | 燃料:"+state.fuel+
+" | 関係:"+state.relationships.length;
+}
+
+function randomCrew(){
+return crew[Math.floor(Math.random()*crew.length)];
+}
+
+function checkEnd(){
+if(state.escaped){
+if(state.relationships.length>=crew.length){
+log("<hr><b>王エンド</b><br>全員との特別な絆を築き、本土へ帰還。");
+}else if(state.relationships.length>=5){
+log("<hr><b>ハーレムエンド</b><br>多くの艦娘と絆を築きつつ帰還。");
+}else{
+log("<hr><b>ノーマルエンド</b><br>本土へ帰還。");
+}
+disableButtons();
+}
+if(state.turn>=20 && !state.escaped){
+if(state.relationships.length>=5){
+log("<hr><b>ハーレムエンド（失敗帰還）</b>");
+}else{
+log("<hr><b>バッドエンド</b><br>脱出失敗。");
+}
+disableButtons();
+}
+if(state.alert>=100 && !state.escaped){
+log("<hr><b>バッドエンド</b><br>包囲された。");
+disableButtons();
+}
+if(state.turn<=10 && state.alert===0 && state.escaped){
+log("<hr><b>胡蝶の夢提督エンド</b><br>誰にも見つからず脱出した。");
+disableButtons();
+}
+}
+
+function disableButtons(){
+document.querySelectorAll("button").forEach(b=>b.disabled=true);
+}
+
+function action(type){
+state.turn++;
+if(type==="移動"){
+log("場所を移動した。");
+if(Math.random()<0.3){state.alert+=10;log("物音が響いた…警戒上昇。");}
+}
+if(type==="調べる"){
+log("周囲を調査した。");
+if(Math.random()<0.5){state.fuel+=1;log("燃料を発見。");}
+}
+if(type==="話す"){
+let c=randomCrew();
+log(c+"と会話した。");
+if(Math.random()<0.5 && !state.relationships.includes(c)){
+state.relationships.push(c);
+log(c+"との特別な絆が深まった。");
+}
+}
+if(type==="命令"){
+log("艦娘に命令を出した。");
+if(Math.random()<0.4){state.alert+=15;log("強引すぎた…警戒上昇。");}
+}
+if(type==="闘う"){
+log("戦闘が発生。");
+state.alert+=20;
+if(Math.random()<0.5){log("勝利した。");}
+else{log("損害を受けた。");}
+}
+if(type==="逃げる"){
+log("その場を離れた。");
+state.alert+=5;
+}
+if(type==="謝る"){
+log("誠意を示した。");
+state.alert=Math.max(0,state.alert-10);
+}
+if(type==="使う"){
+if(state.fuel>=3){
+state.escaped=true;
+log("船を動かせる燃料が揃った。出港！");
+}else{
+log("燃料が足りない。");
+}
+}
+if(type==="隠れる"){
+log("身を潜めた。");
+state.alert=Math.max(0,state.alert-5);
+}
+if(type==="触る"){log("装置を操作した。");}
+if(type==="拾う"){log("何かを拾った。");}
+if(type==="捨てる"){log("何かを捨てた。");}
+
+updateStatus();
+checkEnd();
+}
+
+const commands=["移動","調べる","触る","隠れる","拾う","捨てる","話す","使う","命令","逃げる","謝る","闘う"];
+
+commands.forEach(c=>{
+let btn=document.createElement("button");
+btn.innerText=c;
+btn.onclick=()=>action(c);
+document.getElementById("commands").appendChild(btn);
+});
+
+log("離島鎮守府。脱出を目指せ。");
+updateStatus();
+</script>
+</body>
+</html>
