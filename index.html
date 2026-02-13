@@ -1,154 +1,1233 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>離島鎮守府 脱出行</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>離島鎮守府 脱出行（PWA 1file）</title>
 <style>
-body{background:#111;color:#eee;font-family:sans-serif;margin:0;padding:0}
-#log{padding:15px;height:45vh;overflow-y:auto;border-bottom:1px solid #444}
-#status{padding:10px;font-size:14px;background:#222}
-#commands{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:10px}
-button{padding:10px;background:#333;color:white;border:none;border-radius:5px}
-button:active{background:#555}
+  :root{
+    --bg:#0e0f12; --panel:#171a20; --panel2:#12141a; --line:#2a2f3a;
+    --txt:#e9edf4; --muted:#a9b2c3; --accent:#69c0ff; --danger:#ff6b6b; --ok:#7CFF7C;
+    --btn:#232836; --btn2:#2b3142;
+    --r:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif}
+  header{padding:10px 12px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--panel2))}
+  header .title{font-weight:700;font-size:16px}
+  header .sub{color:var(--muted);font-size:12px;margin-top:2px}
+  main{padding:12px;display:flex;flex-direction:column;gap:10px;min-height:calc(100vh - 56px)}
+  .row{display:flex;gap:10px}
+  .col{flex:1;display:flex;flex-direction:column;gap:10px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  .card .hd{padding:10px 10px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;justify-content:space-between}
+  .card .hd .h{font-weight:700}
+  .card .bd{padding:10px}
+  .pill{display:inline-flex;gap:6px;align-items:center;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:var(--muted);font-size:12px}
+  .pill b{color:var(--txt)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  button{
+    width:100%;border:1px solid rgba(255,255,255,.10);background:var(--btn);color:var(--txt);
+    padding:10px 8px;border-radius:12px;font-weight:650;letter-spacing:.02em;
+    transition:.08s transform,.08s background;
+  }
+  button:active{transform:scale(.99);background:var(--btn2)}
+  button[disabled]{opacity:.35}
+  .log{height:44vh;overflow:auto;line-height:1.55}
+  .log .sep{margin:10px 0;border-top:1px dashed rgba(255,255,255,.15)}
+  .muted{color:var(--muted)}
+  .danger{color:var(--danger)}
+  .ok{color:var(--ok)}
+  .small{font-size:12px}
+  .right{margin-left:auto}
+
+  /* Modal */
+  .modalWrap{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:flex-end;justify-content:center;padding:12px}
+  .modalWrap.show{display:flex}
+  .modal{
+    width:min(720px,100%);max-height:80vh;overflow:auto;
+    background:var(--panel);border:1px solid var(--line);border-radius:18px;
+    box-shadow:0 14px 50px rgba(0,0,0,.45);
+  }
+  .modal .top{padding:12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  .modal .top .t{font-weight:800}
+  .modal .top .x{margin-left:auto;width:auto;padding:8px 10px;border-radius:12px}
+  .modal .body{padding:12px}
+  .tag{display:inline-block;font-size:11px;color:var(--muted);border:1px solid rgba(255,255,255,.12);padding:2px 6px;border-radius:999px;margin-left:6px}
+  .hr{height:1px;background:var(--line);margin:10px 0}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;background:rgba(20,22,28,.95);border:1px solid rgba(255,255,255,.12);padding:10px 12px;border-radius:14px;display:none}
+  .toast.show{display:block}
 </style>
 </head>
 <body>
+<header>
+  <div class="title">離島鎮守府 脱出行</div>
+  <div class="sub">コマンド → 対象選択式 / ロケーション15 / トラップ / 5エンド / 1ファイルPWA</div>
+</header>
 
-<div id="log"></div>
-<div id="status"></div>
-<div id="commands"></div>
+<main>
+  <div class="card">
+    <div class="hd">
+      <div class="h" id="placeName">—</div>
+      <div class="pill"><span>Turn</span> <b id="turn">0</b></div>
+      <div class="pill"><span>Alert</span> <b id="alert">10</b></div>
+      <div class="pill"><span>Fuel</span> <b id="fuel">25</b></div>
+      <div class="pill"><span>絆</span> <b id="bond">0/0</b></div>
+      <button class="right" style="width:auto" id="btnMenu">MENU</button>
+    </div>
+    <div class="bd grid2">
+      <div>
+        <div class="small muted">目的</div>
+        <div id="objective" style="margin-top:4px">—</div>
+        <div class="hr"></div>
+        <div class="small muted">現在地の気配</div>
+        <div id="mood" style="margin-top:4px">—</div>
+      </div>
+      <div>
+        <div class="small muted">同行 / 出現中</div>
+        <div id="present" style="margin-top:4px">—</div>
+        <div class="hr"></div>
+        <div class="small muted">所持品</div>
+        <div id="inv" style="margin-top:4px">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col card">
+      <div class="hd"><div class="h">ログ</div><div class="small muted">（新しいほど下）</div></div>
+      <div class="bd log" id="log"></div>
+    </div>
+
+    <div class="col" style="max-width:420px">
+      <div class="card">
+        <div class="hd"><div class="h">コマンド</div><div class="small muted">押す→対象選択</div></div>
+        <div class="bd">
+          <div class="grid3" id="cmdGrid"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd"><div class="h">艦娘</div><div class="small muted">信頼/親密</div></div>
+        <div class="bd" id="chars"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Target Modal -->
+<div class="modalWrap" id="modalWrap">
+  <div class="modal">
+    <div class="top">
+      <div class="t" id="modalTitle">—</div>
+      <button class="x" id="modalClose">閉じる</button>
+    </div>
+    <div class="body">
+      <div class="small muted" id="modalHint">—</div>
+      <div class="hr"></div>
+      <div class="grid2" id="targetGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Menu Modal -->
+<div class="modalWrap" id="menuWrap">
+  <div class="modal">
+    <div class="top">
+      <div class="t">MENU</div>
+      <button class="x" id="menuClose">閉じる</button>
+    </div>
+    <div class="body">
+      <div class="grid2">
+        <button id="btnSave">セーブ（端末）</button>
+        <button id="btnLoad">ロード（端末）</button>
+        <button id="btnRestart">最初から</button>
+        <button id="btnReplay">同条件で最初から（seed維持）</button>
+      </div>
+      <div class="hr"></div>
+      <div class="small muted">
+        ・端末セーブは localStorage 使用。<br>
+        ・「同条件で最初から」はランダムの癖が同じになり、調整に便利。<br>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
-let state={
-turn:0,
-alert:0,
-fuel:0,
-location:"hq",
-relationships:[],
-caught:false,
-escaped:false
+/* =========
+   Core Data
+========= */
+const CMD = [
+  {id:"move", label:"移動", hint:"移動先を選ぶ"},
+  {id:"examine", label:"調べる", hint:"気になる物/場所/人物を調べる"},
+  {id:"touch", label:"触る", hint:"装置や扉などを操作する"},
+  {id:"hide", label:"隠れる", hint:"警戒を下げる。胡蝶の夢狙いの要"},
+  {id:"pickup", label:"拾う", hint:"落ちている物資を確保"},
+  {id:"drop", label:"捨てる", hint:"所持枠整理（今回は軽め）"},
+  {id:"talk", label:"話す", hint:"艦娘と会話。信頼/親密が伸びる"},
+  {id:"use", label:"使う", hint:"アイテムや装置を使う"},
+  {id:"order", label:"命令", hint:"強い指示。成功すると道が開くが反発も"},
+  {id:"run", label:"逃げる", hint:"離脱。検知が立ちやすい"},
+  {id:"apologize", label:"謝る", hint:"空気を戻す。警戒も少し下がる"},
+  {id:"fight", label:"闘う", hint:"交戦。勝っても音が残る"},
+];
+
+const CHAR = {
+  shigure:{name:"時雨", talk:+2, apol:+4, order:+1, orderMin:25, hide:+1, run:-2, fight:+1, intimacy:6, voice:[
+    "時雨「急がない方がいい。急ぐほど、海は牙をむく」",
+    "時雨「僕は…勝つために、静かに動くよ」",
+    "時雨「見張りは増えてる。手は一つずつ打とう」",
+  ]},
+  asashio:{name:"朝潮", talk:+1, apol:+5, order:+3, orderMin:15, hide:+1, run:-3, fight:+2, intimacy:5, voice:[
+    "朝潮「提督、命令があるなら…私は迷いません」",
+    "朝潮「規律は守ります。だから…貴方も折れないで」",
+    "朝潮「私が盾になります。だから決めてください」",
+  ]},
+  kasumi:{name:"霞", talk:+1, apol:+2, order:-2, orderMin:45, hide:0, run:-2, fight:+2, intimacy:4, voice:[
+    "霞「……状況見えてる？ ちゃんと決めて」",
+    "霞「命令？…それ、責任取れるわけ？」",
+    "霞「……やるならやる。中途半端は嫌い」",
+  ]},
+  takao:{name:"高雄", talk:+2, apol:+3, order:+2, orderMin:25, hide:0, run:-2, fight:+3, intimacy:5, voice:[
+    "高雄「筋を通しましょう。焦りは刃を鈍らせます」",
+    "高雄「私が前に出ます。背中は守って」",
+    "高雄「見極めるべきは敵より“空気”です」",
+  ]},
+  kongo:{name:"金剛", talk:+3, apol:+2, order:+1, orderMin:30, hide:-1, run:-2, fight:+2, intimacy:6, voice:[
+    "金剛「Hey提督！ ここで折れたら終わりネ！」",
+    "金剛「テンション上げていくヨー！…でも音は注意ネ」",
+    "金剛「派手に行くなら、私が囮になれる！」",
+  ]},
+  hatsuzuki:{name:"初月", talk:+1, apol:+2, order:+2, orderMin:25, hide:+2, run:-1, fight:+2, intimacy:4, voice:[
+    "初月「静かに。見られる方が損だ」",
+    "初月「合理的に行こう。感情は後だ」",
+    "初月「今は“勝ち筋”だけ追え」",
+  ]},
+  urakaze:{name:"浦風", talk:+2, apol:+4, order:+1, orderMin:20, hide:+1, run:-1, fight:+1, intimacy:6, voice:[
+    "浦風「無理せんで。整えれば、道は開くけぇ」",
+    "浦風「提督、手ぇ貸すよ。焦らんでええ」",
+    "浦風「気配…変わったね。いま、慎重に」",
+  ]},
+  ikazuchi:{name:"雷", talk:+3, apol:+3, order:0, orderMin:30, hide:+1, run:-1, fight:+1, intimacy:7, voice:[
+    "雷「大丈夫よ！ あたしがついてるんだから！」",
+    "雷「ね、ね！ 今のうちに行こ！…静かにね！」",
+    "雷「提督、元気出して！ 私がなんとかする！」",
+  ]},
+  hibiki:{name:"響", talk:+1, apol:+2, order:+1, orderMin:20, hide:+3, run:-1, fight:+2, intimacy:4, voice:[
+    "響「……言葉は少なくていい。動く」",
+    "響「静寂は味方だ。私が消す」",
+    "響「見られたら終わり。見せなければいい」",
+  ]},
 };
 
-const crew=["時雨","朝潮","霞","金剛","響","雷","高雄","初月","浦風"];
+const LOC = {
+  hq:{name:"司令室", exits:["radio","workshop","storage","quarters","watch"], danger:6,
+      mood:["机の上の海図が、夜の潮を吸って黒い。","小さな音がやけに大きい。"],
+      objects:["机","海図","書類棚"]},
+  radio:{name:"無線室", exits:["hq","watch"], danger:10,
+      mood:["ノイズが耳の奥を舐める。","信号灯が瞬き、嘘みたいに静かだ。"],
+      objects:["受信機","アンテナ基部","暗号表"]},
+  workshop:{name:"工廠", exits:["hq","dock","generator"], danger:9,
+      mood:["油の匂い。金属が冷たい。","工具が整列して、逆に不気味だ。"],
+      objects:["作業台","工具箱","予備部材"]},
+  storage:{name:"資材庫", exits:["hq","dock","warehouse"], danger:11,
+      mood:["棚の影が深い。何かが息を潜めている。","木箱の隙間に潮が溜まる。"],
+      objects:["戸棚","棚","木箱"]},
+  quarters:{name:"居住区", exits:["hq","mess","bath"], danger:7,
+      mood:["誰かの生活の匂いがする。","寝台が整いすぎて、落ち着かない。"],
+      objects:["寝台","私物箱","カーテン"]},
+  mess:{name:"食堂", exits:["quarters","hq"], danger:6,
+      mood:["食器の音が残響する気がする。","配膳口の奥が暗い。"],
+      objects:["テーブル","配膳口","貯水槽"]},
+  watch:{name:"見張り台", exits:["hq","radio","yard"], danger:12,
+      mood:["風が冷たい。海の顔色がわかる場所。","警鐘が沈黙している。"],
+      objects:["双眼鏡","警鐘","照明スイッチ"]},
+  yard:{name:"中庭", exits:["watch","dock","armory","tunnel"], danger:13,
+      mood:["外灯が揺れて影を切る。","砂利が足音を裏切る。"],
+      objects:["外灯","通路","排水溝"]},
+  armory:{name:"兵装庫", exits:["yard","dock"], danger:14,
+      mood:["金属臭が強い。","扉が重く、閉まる音が怖い。"],
+      objects:["兵装棚","木箱","固定具"]},
+  dock:{name:"埠頭", exits:["yard","workshop","storage","armory","tunnel"], danger:16,
+      mood:["波が硬い音を立てる。出るなら今だ。","封鎖ゲートが“待っている”。"],
+      objects:["輸送船","封鎖ゲート","繋留杭"]},
+  clinic:{name:"医務室", exits:["hq"], danger:5,
+      mood:["薬品の匂いが頭をクリアにする。","静けさが“安心”に見える罠。"],
+      objects:["薬棚","ベッド","器具台"]},
+  bath:{name:"浴場", exits:["quarters"], danger:8,
+      mood:["湯気の名残が空気を重くする。","足音が吸われる。"],
+      objects:["脱衣棚","洗い場","鏡"]},
+  tunnel:{name:"連絡坑道", exits:["dock","yard","generator"], danger:15,
+      mood:["狭さが距離を近づける。","配管の温度が、誰かの体温みたいだ。"],
+      objects:["配管","点検口","ケーブル"]},
+  generator:{name:"発電室", exits:["workshop","tunnel"], danger:17,
+      mood:["低い振動。心臓と同期しそうだ。","機械の唸りが隠れ蓑にもなる。"],
+      objects:["発電機","制御盤","換気扇"]},
+  warehouse:{name:"外倉庫", exits:["yard","storage"], danger:14,
+      mood:["鉄扉が湿って滑る。","外気が冷たく、気配が鋭い。"],
+      objects:["鉄扉","パレット","防水シート"]},
+};
 
-function log(text){
-document.getElementById("log").innerHTML+=text+"<br>";
-document.getElementById("log").scrollTop=99999;
-}
+const ITEMS = {
+  scrap:{name:"部品片", desc:"工廠で修理に使える"},
+  gate_key:{name:"ゲート鍵", desc:"埠頭の封鎖ゲート解除"},
+  codebook:{name:"暗号表", desc:"無線の照合に必要"},
+  fuel_can:{name:"燃料缶", desc:"燃料+8"},
+};
 
-function updateStatus(){
-document.getElementById("status").innerHTML=
-"ターン:"+state.turn+
-" | 警戒:"+state.alert+
-" | 燃料:"+state.fuel+
-" | 関係:"+state.relationships.length;
-}
+const END = {
+  normal:"【ノーマルエンド】本土に帰投した。",
+  bad:"【バッドエンド】脱出は叶わなかった。",
+  harem:"【ハーレムエンド】絆が極まったまま結末を迎えた。",
+  king:"【王エンド】全員との誓いを背負い、結末を統べた。",
+  dream:"【胡蝶の夢提督エンド】誰にも気取られず、静かに渡り切った。",
+};
 
-function randomCrew(){
-return crew[Math.floor(Math.random()*crew.length)];
-}
+/* =========
+   RNG (seed)
+========= */
+function mulberry32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;}}
+let seed = (Date.now()>>>0) ^ 0xA5A5A5A5;
+let rnd = mulberry32(seed);
+const rint = (n)=>Math.floor(rnd()*n);
+const chance = (p)=>rnd()*100 < p;
 
-function checkEnd(){
-if(state.escaped){
-if(state.relationships.length>=crew.length){
-log("<hr><b>王エンド</b><br>全員との特別な絆を築き、本土へ帰還。");
-}else if(state.relationships.length>=5){
-log("<hr><b>ハーレムエンド</b><br>多くの艦娘と絆を築きつつ帰還。");
-}else{
-log("<hr><b>ノーマルエンド</b><br>本土へ帰還。");
-}
-disableButtons();
-}
-if(state.turn>=20 && !state.escaped){
-if(state.relationships.length>=5){
-log("<hr><b>ハーレムエンド（失敗帰還）</b>");
-}else{
-log("<hr><b>バッドエンド</b><br>脱出失敗。");
-}
-disableButtons();
-}
-if(state.alert>=100 && !state.escaped){
-log("<hr><b>バッドエンド</b><br>包囲された。");
-disableButtons();
-}
-if(state.turn<=10 && state.alert===0 && state.escaped){
-log("<hr><b>胡蝶の夢提督エンド</b><br>誰にも見つからず脱出した。");
-disableButtons();
-}
-}
-
-function disableButtons(){
-document.querySelectorAll("button").forEach(b=>b.disabled=true);
-}
-
-function action(type){
-state.turn++;
-if(type==="移動"){
-log("場所を移動した。");
-if(Math.random()<0.3){state.alert+=10;log("物音が響いた…警戒上昇。");}
-}
-if(type==="調べる"){
-log("周囲を調査した。");
-if(Math.random()<0.5){state.fuel+=1;log("燃料を発見。");}
-}
-if(type==="話す"){
-let c=randomCrew();
-log(c+"と会話した。");
-if(Math.random()<0.5 && !state.relationships.includes(c)){
-state.relationships.push(c);
-log(c+"との特別な絆が深まった。");
-}
-}
-if(type==="命令"){
-log("艦娘に命令を出した。");
-if(Math.random()<0.4){state.alert+=15;log("強引すぎた…警戒上昇。");}
-}
-if(type==="闘う"){
-log("戦闘が発生。");
-state.alert+=20;
-if(Math.random()<0.5){log("勝利した。");}
-else{log("損害を受けた。");}
-}
-if(type==="逃げる"){
-log("その場を離れた。");
-state.alert+=5;
-}
-if(type==="謝る"){
-log("誠意を示した。");
-state.alert=Math.max(0,state.alert-10);
-}
-if(type==="使う"){
-if(state.fuel>=3){
-state.escaped=true;
-log("船を動かせる燃料が揃った。出港！");
-}else{
-log("燃料が足りない。");
-}
-}
-if(type==="隠れる"){
-log("身を潜めた。");
-state.alert=Math.max(0,state.alert-5);
-}
-if(type==="触る"){log("装置を操作した。");}
-if(type==="拾う"){log("何かを拾った。");}
-if(type==="捨てる"){log("何かを捨てた。");}
-
-updateStatus();
-checkEnd();
-}
-
-const commands=["移動","調べる","触る","隠れる","拾う","捨てる","話す","使う","命令","逃げる","謝る","闘う"];
-
-commands.forEach(c=>{
-let btn=document.createElement("button");
-btn.innerText=c;
-btn.onclick=()=>action(c);
-document.getElementById("commands").appendChild(btn);
+/* =========
+   Game State
+========= */
+const defaultState = ()=>({
+  seed,
+  turn:0,
+  alert:10,
+  fuel:25,
+  ammo:20,
+  inventory:[], invLimit:8,
+  location:"hq",
+  present:[], // char ids currently present
+  flags:new Set(), // route_confirmed, ship_repaired, has_gate_key, gate_opened, detected_once, escaped_mainland, captured...
+  chars:Object.fromEntries(Object.keys(CHAR).map(id=>[id,{id,name:CHAR[id].name,trust:50,intimacy:0,bonded:false}])),
+  log:[],
+  ended:false,
+  ending:null,
+  lastSave:null,
 });
 
-log("離島鎮守府。脱出を目指せ。");
-updateStatus();
+let S = defaultState();
+
+/* =========
+   Utilities
+========= */
+const clamp=(v,min=0,max=100)=>Math.max(min,Math.min(max,v));
+const logEl = document.getElementById("log");
+function pushLog(line, cls=""){
+  const div=document.createElement("div");
+  if(cls) div.className=cls;
+  div.innerHTML=line;
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight + 9999;
+  S.log.push({line,cls});
+  if(S.log.length>260) S.log.shift();
+}
+function sep(){ pushLog('<div class="sep"></div>'); }
+
+function toast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg;
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 1200);
+}
+
+function bondedCount(){
+  const ids=Object.keys(S.chars);
+  const b=ids.filter(id=>S.chars[id].bonded).length;
+  return [b, ids.length];
+}
+
+function objectiveText(){
+  const a=[];
+  a.push((S.flags.has("route_confirmed")?`<span class="ok">航路：確定</span>`:`<span class="muted">航路：未確定（無線室）</span>`));
+  a.push((S.flags.has("has_gate_key")?`<span class="ok">鍵：確保</span>`:`<span class="muted">鍵：未確保（資材庫）</span>`));
+  a.push((S.flags.has("ship_repaired")?`<span class="ok">整備：完了</span>`:`<span class="muted">整備：未完（工廠）</span>`));
+  a.push((S.flags.has("gate_opened")?`<span class="ok">封鎖：解除</span>`:`<span class="muted">封鎖：未解除（埠頭）</span>`));
+  a.push((S.fuel>=35?`<span class="ok">燃料：十分</span>`:`<span class="muted">燃料：不足（拾う/燃料缶）</span>`));
+  return a.join(" / ");
+}
+
+function moodText(){
+  const L=LOC[S.location];
+  const m=L.mood[rint(L.mood.length)];
+  const danger = L.danger + Math.floor(S.alert/10);
+  const d = danger>=22?`<span class="danger">危険</span>`: danger>=16?`<span class="muted">張り詰め</span>`:`<span class="ok">薄い</span>`;
+  return `${m} <span class="tag">気配:${d}</span>`;
+}
+
+function presentText(){
+  if(!S.present.length) return `<span class="muted">（静かだ…）</span>`;
+  return S.present.map(id=>`<b>${CHAR[id].name}</b>`).join(" / ");
+}
+
+function invText(){
+  if(!S.inventory.length) return `<span class="muted">なし</span>`;
+  return S.inventory.map(it=>`<span class="pill"><b>${ITEMS[it]?.name ?? it}</b></span>`).join(" ");
+}
+
+function renderChars(){
+  const box=document.getElementById("chars");
+  const ids=Object.keys(S.chars);
+  const rows=ids.map(id=>{
+    const c=S.chars[id];
+    const t = c.trust, i=c.intimacy;
+    const bond = c.bonded?`<span class="tag ok">絆</span>`:"";
+    return `
+      <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.08)">
+        <div style="display:flex;gap:8px;align-items:center">
+          <b>${c.name}</b> ${bond}
+          <span class="right small muted">信頼 ${t} / 親密 ${i}</span>
+        </div>
+        <div class="small muted">立場: ${stanceOf(id)}</div>
+      </div>
+    `;
+  }).join("");
+  box.innerHTML = `<div>${rows}</div>`;
+}
+
+function stanceOf(id){
+  // 「敵にも味方にもなる」表現：trust低いと敵対寄り、一定以上で味方
+  const t=S.chars[id].trust;
+  if(t>=70) return "味方寄り";
+  if(t<=30) return "敵対寄り";
+  return "中立";
+}
+
+function renderTop(){
+  document.getElementById("placeName").textContent = LOC[S.location].name;
+  document.getElementById("turn").textContent = S.turn;
+  document.getElementById("alert").textContent = S.alert;
+  document.getElementById("fuel").textContent = S.fuel;
+  const [b,a]=bondedCount();
+  document.getElementById("bond").textContent = `${b}/${a}`;
+  document.getElementById("objective").innerHTML = objectiveText();
+  document.getElementById("mood").innerHTML = moodText();
+  document.getElementById("present").innerHTML = presentText();
+  document.getElementById("inv").innerHTML = invText();
+  renderChars();
+}
+
+function resetLogFromState(){
+  logEl.innerHTML="";
+  S.log.forEach(e=>{
+    const div=document.createElement("div");
+    if(e.cls) div.className=e.cls;
+    div.innerHTML=e.line;
+    logEl.appendChild(div);
+  });
+  logEl.scrollTop = logEl.scrollHeight + 9999;
+}
+
+/* =========
+   Encounter + Scene Setup
+========= */
+function refreshPresent(force=false){
+  const L=LOC[S.location];
+  // 「絶対艦娘会わない」対策：基本 1〜2人は高確率で出す
+  // force なら必ず1人以上
+  let count = chance(55)?2:1;
+  if(force) count = Math.max(1,count);
+
+  // 出現テーブル（場所ごとに偏り）
+  const pool = locationPool(S.location);
+  const pick=[];
+  const tries=20;
+  for(let k=0;k<tries && pick.length<count;k++){
+    const id=pool[rint(pool.length)];
+    if(!pick.includes(id)) pick.push(id);
+  }
+  S.present = pick;
+
+  if(force && !S.present.length){
+    S.present=[pool[0]];
+  }
+}
+
+function locationPool(loc){
+  // 9人をベースに、場所に応じて出やすい艦娘を寄せる
+  const all=Object.keys(CHAR);
+  const bias={
+    hq:["shigure","asashio","kasumi"],
+    radio:["hatsuzuki","shigure","hibiki"],
+    workshop:["takao","urakaze","hatsuzuki"],
+    storage:["ikazuchi","hibiki","kasumi"],
+    quarters:["kasumi","kongo","ikazuchi","urakaze"],
+    mess:["kongo","urakaze","ikazuchi"],
+    watch:["hatsuzuki","hibiki","shigure"],
+    yard:["asashio","takao","shigure","hibiki"],
+    armory:["takao","asashio","hatsuzuki"],
+    dock:["asashio","kasumi","takao","hibiki"],
+    clinic:["urakaze","asashio"],
+    bath:["kongo","ikazuchi","urakaze"],
+    tunnel:["hibiki","shigure","hatsuzuki"],
+    generator:["hatsuzuki","hibiki"],
+    warehouse:["kasumi","takao","ikazuchi"],
+  }[loc] || [];
+  const pool = [...bias, ...all, ...bias]; // biasを二重にして出やすく
+  return pool;
+}
+
+function enterLocation(loc){
+  S.location = loc;
+  refreshPresent(true);
+  sep();
+  pushLog(`—— <b>${LOC[loc].name}</b> ——`);
+  pushLog(sceneTextFor(loc));
+  renderTop();
+}
+
+function sceneTextFor(loc){
+  const L=LOC[loc];
+  const base = L.mood[rint(L.mood.length)];
+  const spice = [
+    "遠くで金属が鳴る。誰かが動いている。",
+    "風向きが変わる。海が機嫌を損ねた気配。",
+    "静けさが、逆に不自然だ。",
+    "足音を立てないことが、最優先になる。",
+  ][rint(4)];
+  return `${base}<br><span class="muted">${spice}</span>`;
+}
+
+/* =========
+   Command -> Target UI
+========= */
+const cmdGrid=document.getElementById("cmdGrid");
+const modalWrap=document.getElementById("modalWrap");
+const modalTitle=document.getElementById("modalTitle");
+const modalHint=document.getElementById("modalHint");
+const targetGrid=document.getElementById("targetGrid");
+document.getElementById("modalClose").onclick=()=>closeTarget();
+
+let pendingCmd=null;
+
+function openTarget(cmdId){
+  if(S.ended) return toast("エンド後はMENUからやり直し");
+  pendingCmd = cmdId;
+  const cmd = CMD.find(c=>c.id===cmdId);
+  modalTitle.textContent = `対象を選択：${cmd.label}`;
+  modalHint.textContent = cmd.hint;
+
+  const targets = buildTargets(cmdId);
+  targetGrid.innerHTML = targets.map(t=>{
+    return `<button data-t="${t.id}">${t.label}${t.tag?`<span class="tag">${t.tag}</span>`:""}</button>`;
+  }).join("");
+
+  targetGrid.querySelectorAll("button").forEach(b=>{
+    b.onclick=()=>{ runCommand(pendingCmd, b.dataset.t); };
+  });
+
+  modalWrap.classList.add("show");
+}
+
+function closeTarget(){
+  modalWrap.classList.remove("show");
+  pendingCmd=null;
+}
+
+function buildTargets(cmdId){
+  const L=LOC[S.location];
+  const t=[];
+  if(cmdId==="move"){
+    L.exits.forEach(e=>{
+      t.push({id:`loc:${e}`, label:`${LOC[e].name}へ`, tag:"移動"});
+    });
+    return t;
+  }
+
+  // 人物
+  if(["talk","order","apologize"].includes(cmdId)){
+    if(!S.present.length) t.push({id:"none", label:"（誰もいない）", tag:""});
+    S.present.forEach(id=>{
+      t.push({id:`ch:${id}`, label:CHAR[id].name, tag:stanceOf(id)});
+    });
+    return t;
+  }
+
+  // 調べる/触る：場所のオブジェクト + 重要装置
+  if(["examine","touch"].includes(cmdId)){
+    L.objects.forEach(o=>t.push({id:`obj:${o}`, label:o, tag:"場所"}));
+    // 重要スポットをそれっぽく混ぜる
+    if(S.location==="dock") t.push({id:"obj:輸送船", label:"輸送船", tag:"脱出"});
+    if(S.location==="radio") t.push({id:"obj:受信機", label:"受信機", tag:"航路"});
+    if(S.location==="storage") t.push({id:"obj:戸棚", label:"戸棚", tag:"鍵"});
+    if(S.location==="workshop") t.push({id:"obj:作業台", label:"作業台", tag:"整備"});
+    return uniqTargets(t);
+  }
+
+  // 使う：アイテム or 特定装置
+  if(cmdId==="use"){
+    if(S.inventory.length){
+      S.inventory.forEach(it=>t.push({id:`it:${it}`, label:ITEMS[it]?.name ?? it, tag:"所持"}));
+    }
+    // 直接アクション用
+    if(S.location==="dock") t.push({id:"use:gate", label:"封鎖ゲートに使う", tag:"解除"});
+    if(S.location==="dock") t.push({id:"use:ship", label:"輸送船を動かす", tag:"脱出"});
+    if(S.location==="radio") t.push({id:"use:radio", label:"無線照合を進める", tag:"航路"});
+    if(S.location==="workshop") t.push({id:"use:repair", label:"修理を進める", tag:"整備"});
+    return uniqTargets(t.length? t : [{id:"none",label:"（使えるものがない）"}]);
+  }
+
+  // 拾う：燃料・部品など（場所により差）
+  if(cmdId==="pickup"){
+    // 毎回は出さず、回数でリソースが増える感じ
+    t.push({id:"pick:fuel_can", label:"燃料缶", tag:"+8"});
+    t.push({id:"pick:scrap", label:"部品片", tag:"修理"});
+    if(S.location==="radio") t.push({id:"pick:codebook", label:"暗号表", tag:"航路"});
+    if(S.location==="storage") t.push({id:"pick:gate_key", label:"ゲート鍵", tag:"封鎖"});
+    return uniqTargets(t);
+  }
+
+  if(cmdId==="hide"){
+    return [
+      {id:"hide:shadow", label:"物陰", tag:"警戒↓"},
+      {id:"hide:stay", label:"息を殺す", tag:"胡蝶"},
+    ];
+  }
+
+  if(cmdId==="run"){
+    return [
+      {id:"run:back", label:"引く", tag:"検知↑"},
+      {id:"run:cut", label:"迂回する", tag:"警戒↑"},
+    ];
+  }
+
+  if(cmdId==="fight"){
+    return [
+      {id:"fight:short", label:"短い衝突", tag:"音"},
+      {id:"fight:break", label:"突破", tag:"危険"},
+    ];
+  }
+
+  if(cmdId==="drop"){
+    if(!S.inventory.length) return [{id:"none", label:"（捨てる物がない）"}];
+    return S.inventory.map(it=>({id:`drop:${it}`, label:`${ITEMS[it]?.name ?? it}を捨てる`, tag:"整理"}));
+  }
+
+  return [{id:"none", label:"（対象なし）"}];
+}
+
+function uniqTargets(arr){
+  const seen=new Set();
+  return arr.filter(x=>{
+    const k=x.id+"|"+x.label;
+    if(seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+}
+
+/* =========
+   Game Logic
+========= */
+function runCommand(cmdId, targetId){
+  closeTarget();
+  if(S.ended) return;
+
+  // Turn advance
+  S.turn++;
+
+  // base alert shift by command
+  const baseAlert = {
+    fight:+16, touch:+6, run:+10, hide:-9, order:+2, pickup:+1, move:+2, examine:+1, talk:0, apologize:-1, use:+1, drop:0
+  }[cmdId] ?? 0;
+  S.alert = clamp(S.alert + baseAlert);
+
+  // execute
+  const cmdLabel = CMD.find(c=>c.id===cmdId)?.label ?? cmdId;
+
+  // time pressure
+  if(S.turn===30) pushLog("潮が悪い。海の顔が変わってきた。", "muted");
+  if(S.turn===55) pushLog("視線が硬くなる。空気が狭い。", "muted");
+
+  // parse target
+  if(targetId==="none"){
+    pushLog(`${cmdLabel}：空振りした。`, "muted");
+    afterStep();
+    return;
+  }
+
+  // MOVEMENT
+  if(cmdId==="move" && targetId.startsWith("loc:")){
+    const next = targetId.slice(4);
+    pushLog(`移動する… <span class="muted">${LOC[next].name}</span>`);
+    // 移動時の小トラップ：危険地帯ほど検知が立つ
+    if(chance(10 + LOC[next].danger/2)){
+      S.flags.add("detected_once");
+      S.alert = clamp(S.alert+8);
+      pushLog("移動の気配が漏れた。<span class='danger'>検知</span>", "danger");
+    }
+    enterLocation(next);
+    afterStep();
+    return;
+  }
+
+  // TALK / APOLOGIZE / ORDER
+  if(["talk","apologize","order"].includes(cmdId) && targetId.startsWith("ch:")){
+    const id = targetId.slice(3);
+    const c = S.chars[id];
+    const P = CHAR[id];
+
+    if(cmdId==="talk"){
+      pushLog(P.voice[rint(P.voice.length)]);
+      c.trust = clamp(c.trust + P.talk);
+      c.intimacy = clamp(c.intimacy + P.intimacy);
+      if(c.intimacy>=100 && !c.bonded){ c.bonded=true; pushLog(`（${c.name}との絆が確かなものになった）`, "ok"); }
+      // 会話したら周囲が落ち着くこともある/逆もある
+      if(chance(22)) { S.alert = clamp(S.alert-3); pushLog("息が整う。警戒がわずかに緩む。", "muted"); }
+    }
+
+    if(cmdId==="apologize"){
+      pushLog(apologyLine(id));
+      c.trust = clamp(c.trust + P.apol);
+      c.intimacy = clamp(c.intimacy + Math.max(2, Math.floor(P.intimacy/2)));
+      S.alert = clamp(S.alert - 4);
+      if(c.intimacy>=100 && !c.bonded){ c.bonded=true; pushLog(`（${c.name}との絆が確かなものになった）`, "ok"); }
+    }
+
+    if(cmdId==="order"){
+      if(c.trust < P.orderMin){
+        pushLog(`${c.name}は命令に渋い反応を返した。`, "muted");
+        c.trust = clamp(c.trust - 2);
+        S.alert = clamp(S.alert + 4);
+      }else{
+        pushLog(orderLine(id));
+        c.trust = clamp(c.trust + P.order);
+        // 命令成功の“実利”
+        orderBenefit(id);
+      }
+    }
+
+    afterStep();
+    return;
+  }
+
+  // EXAMINE
+  if(cmdId==="examine"){
+    const L=LOC[S.location];
+    pushLog(`調査：<span class="muted">${labelOfTarget(targetId)}</span>`);
+    examineEvent(targetId);
+    afterStep();
+    return;
+  }
+
+  // TOUCH
+  if(cmdId==="touch"){
+    pushLog(`操作：<span class="muted">${labelOfTarget(targetId)}</span>`);
+    touchEvent(targetId);
+    afterStep();
+    return;
+  }
+
+  // PICKUP
+  if(cmdId==="pickup" && targetId.startsWith("pick:")){
+    const it = targetId.slice(5);
+    pickupItem(it);
+    afterStep();
+    return;
+  }
+
+  // USE
+  if(cmdId==="use"){
+    useEvent(targetId);
+    afterStep();
+    return;
+  }
+
+  // HIDE
+  if(cmdId==="hide"){
+    pushLog("身を潜める…");
+    S.alert = clamp(S.alert - (targetId==="hide:stay"? 12 : 8));
+    if(chance(18)) pushLog("視線が滑っていく。<span class='ok'>やり過ごした</span>", "ok");
+    afterStep();
+    return;
+  }
+
+  // RUN
+  if(cmdId==="run"){
+    pushLog("退く。背中に視線が刺さる。", "muted");
+    S.flags.add("detected_once");
+    S.alert = clamp(S.alert + (targetId==="run:cut"? 10: 7));
+    if(chance(35)) refreshPresent(true);
+    afterStep();
+    return;
+  }
+
+  // FIGHT
+  if(cmdId==="fight"){
+    S.flags.add("detected_once");
+    S.alert = clamp(S.alert + (targetId==="fight:break"? 18: 12));
+    pushLog("短い衝突。勝っても、音が残る。", "danger");
+    if(chance(55)){
+      pushLog("押し返した。だが状況は悪化する。", "muted");
+    }else{
+      pushLog("損害。時間が削れる。", "danger");
+      if(chance(25)) S.flags.add("time_over");
+    }
+    afterStep();
+    return;
+  }
+
+  // DROP
+  if(cmdId==="drop" && targetId.startsWith("drop:")){
+    const it=targetId.slice(5);
+    const idx=S.inventory.indexOf(it);
+    if(idx>=0){ S.inventory.splice(idx,1); pushLog(`（破棄：${ITEMS[it]?.name ?? it}）`, "muted"); }
+    afterStep();
+    return;
+  }
+
+  // fallback
+  pushLog(`${cmdLabel}：うまくいかない。`, "muted");
+  afterStep();
+}
+
+function labelOfTarget(tid){
+  if(tid.startsWith("obj:")) return tid.slice(4);
+  if(tid.startsWith("ch:")) return CHAR[tid.slice(3)]?.name ?? tid;
+  if(tid.startsWith("it:")) return ITEMS[tid.slice(3)]?.name ?? tid;
+  return tid;
+}
+
+function apologyLine(id){
+  switch(id){
+    case "kasumi": return "霞「……謝って済むなら楽よね。でも、今は前に進みなさい」";
+    case "asashio": return "朝潮「……受け取りました。提督が誠実なら、私は支えます」";
+    case "shigure": return "時雨「いい。けど次は、同じ間違いはしないで」";
+    case "hibiki": return "響「……分かった」";
+    case "kongo": return "金剛「No problem！ 取り返せばいいネ！」";
+    default: return `${CHAR[id].name}は小さく頷いた。`;
+  }
+}
+
+function orderLine(id){
+  const tight = (LOC[S.location].danger + Math.floor(S.alert/10)) >= 18;
+  switch(id){
+    case "asashio": return tight ? "朝潮「了解。最短で道を開きます」" : "朝潮「命令を確認しました」";
+    case "kasumi": return tight ? "霞「……仕方ない。やるわよ」" : "霞「ちゃんと根拠あるの？」";
+    case "hatsuzuki": return "初月「合理的だ。従う」";
+    case "hibiki": return "響「……了解」";
+    case "kongo": return "金剛「Okey！ 派手にいくヨ！…音は抑えるネ」";
+    case "takao": return "高雄「承知。護ります」";
+    default: return `${CHAR[id].name}「……分かった」`;
+  }
+}
+
+function orderBenefit(id){
+  // 命令成功の実利：状況改善 or 目的進行
+  if(chance(30)){
+    S.alert = clamp(S.alert - 6);
+    pushLog("隊列が整う。警戒が緩む。", "ok");
+  }
+  if(S.location==="radio" && !S.flags.has("route_confirmed") && chance(35)){
+    S.flags.add("contact_possible");
+    pushLog("符丁の手掛かりを掴んだ。<span class='ok'>照合が進む</span>", "ok");
+  }
+  if(S.location==="dock" && S.flags.has("gate_opened") && chance(25)){
+    S.fuel = Math.max(0, S.fuel + 4);
+    pushLog("出港準備が進む。燃料が少し増えた。", "ok");
+  }
+}
+
+function examineEvent(targetId){
+  // 目的アイテム/フラグの進行
+  if(S.location==="storage" && targetId==="obj:戸棚"){
+    if(!S.flags.has("has_gate_key")){
+      S.flags.add("has_gate_key");
+      pushLog("奥の戸棚に、封鎖ゲートの刻印がある鍵束。<span class='ok'>鍵を確保</span>", "ok");
+      // 鍵はフラグ扱い（アイテムとしても持てる）
+      addItem("gate_key", true);
+    }else{
+      pushLog("戸棚は空だ。もう鍵は手元にある。", "muted");
+    }
+    return;
+  }
+
+  if(S.location==="radio" && targetId==="obj:暗号表"){
+    if(!hasItem("codebook")){
+      addItem("codebook");
+      pushLog("暗号表を見つけた。照合が楽になる。", "ok");
+    }else pushLog("暗号表は既に持っている。", "muted");
+    return;
+  }
+
+  if(S.location==="dock" && targetId==="obj:封鎖ゲート"){
+    pushLog("封鎖は頑丈だ。鍵か、手順が要る。", "muted");
+    return;
+  }
+
+  // 一般調査：資材/燃料/警戒変動
+  if(chance(45)){
+    if(chance(55)) { S.fuel = Math.max(0, S.fuel + 2); pushLog("燃料の匂い。少し確保できた。<span class='ok'>Fuel+2</span>", "ok"); }
+    else { addItem("scrap"); pushLog("部品片。工廠で使えるかもしれない。", "ok"); }
+  }else{
+    pushLog("手掛かりは薄い。", "muted");
+  }
+}
+
+function touchEvent(targetId){
+  // 無線の進行
+  if(S.location==="radio" && targetId==="obj:受信機"){
+    if(!S.flags.has("contact_possible")){
+      S.flags.add("contact_possible");
+      pushLog("ノイズの底に符丁。繋がる“窓”がある。<span class='ok'>接触可能</span>", "ok");
+    }else{
+      pushLog("ノイズを捌く。照合の段階に入れる。", "muted");
+    }
+    return;
+  }
+
+  // 埠頭：出港（最終）
+  if(S.location==="dock" && (targetId==="obj:輸送船" || targetId==="obj:輸送船")){
+    tryEscape();
+    return;
+  }
+
+  // 工廠：修理下準備
+  if(S.location==="workshop" && targetId==="obj:作業台"){
+    pushLog("必要な部材が揃えば、短時間で直せる。", "muted");
+    return;
+  }
+
+  // 一般：誤作動/警戒
+  if(chance(22)){
+    S.flags.add("detected_once");
+    S.alert = clamp(S.alert+10);
+    pushLog("小さな音が響いた。<span class='danger'>検知</span>", "danger");
+  }else{
+    pushLog("反応は薄い。だが道は探れる。", "muted");
+  }
+}
+
+function pickupItem(it){
+  // 取得頻度を上げつつ、枠制限で取捨選択が生まれる
+  if(it==="fuel_can"){
+    pushLog("燃料缶を確保した。<span class='ok'>Fuel+8</span>", "ok");
+    S.fuel = Math.max(0, S.fuel + 8);
+    return;
+  }
+  if(it==="scrap"){
+    addItem("scrap");
+    pushLog("部品片を拾った。", "ok");
+    return;
+  }
+  if(it==="codebook"){
+    addItem("codebook");
+    pushLog("暗号表を確保した。", "ok");
+    return;
+  }
+  if(it==="gate_key"){
+    S.flags.add("has_gate_key");
+    addItem("gate_key", true);
+    pushLog("ゲート鍵を確保した。", "ok");
+    return;
+  }
+}
+
+function useEvent(targetId){
+  // アイテム使用
+  if(targetId.startsWith("it:")){
+    const it=targetId.slice(3);
+
+    if(it==="scrap"){
+      if(S.location==="workshop"){
+        // 修理
+        S.flags.add("ship_repaired");
+        removeItem("scrap");
+        pushLog("部品片が噛み合う。機関の息が戻る。<span class='ok'>整備完了</span>", "ok");
+        S.alert = clamp(S.alert+2);
+      }else{
+        pushLog("ここでは活きない。工廠が必要だ。", "muted");
+      }
+      return;
+    }
+
+    if(it==="codebook"){
+      if(S.location==="radio" && S.flags.has("contact_possible")){
+        S.flags.add("route_confirmed");
+        pushLog("暗号表で照合。航路が確定する。<span class='ok'>航路確定</span>", "ok");
+      }else{
+        pushLog("照合の環境が整っていない。", "muted");
+      }
+      return;
+    }
+
+    if(it==="gate_key"){
+      if(S.location==="dock"){
+        openGate();
+      }else{
+        pushLog("埠頭の封鎖ゲートで使うべきだ。", "muted");
+      }
+      return;
+    }
+
+    pushLog("使い道が違う気がする。", "muted");
+    return;
+  }
+
+  // ショートカット使用
+  if(targetId==="use:radio"){
+    if(S.location!=="radio"){ pushLog("ここでは無線照合ができない。", "muted"); return; }
+    if(!S.flags.has("contact_possible")){ pushLog("まず受信機を確かめる必要がある。", "muted"); return; }
+    if(hasItem("codebook")){
+      S.flags.add("route_confirmed");
+      pushLog("照合が一気に進む。<span class='ok'>航路確定</span>", "ok");
+    }else{
+      if(chance(40)){ S.flags.add("route_confirmed"); pushLog("不安定だが照合に成功。<span class='ok'>航路確定</span>", "ok"); }
+      else pushLog("照合が足りない。暗号表が欲しい。", "muted");
+    }
+    return;
+  }
+
+  if(targetId==="use:repair"){
+    if(S.location!=="workshop"){ pushLog("ここでは修理ができない。", "muted"); return; }
+    if(S.flags.has("ship_repaired")){ pushLog("整備は完了している。", "muted"); return; }
+    if(hasItem("scrap")){
+      S.flags.add("ship_repaired");
+      removeItem("scrap");
+      pushLog("整備が通る。<span class='ok'>整備完了</span>", "ok");
+    }else{
+      pushLog("部品が足りない。部品片が必要だ。", "muted");
+    }
+    return;
+  }
+
+  if(targetId==="use:gate"){
+    if(S.location!=="dock"){ pushLog("ここでは封鎖ゲートがない。", "muted"); return; }
+    openGate();
+    return;
+  }
+
+  if(targetId==="use:ship"){
+    if(S.location!=="dock"){ pushLog("ここでは出港できない。", "muted"); return; }
+    tryEscape();
+    return;
+  }
+
+  pushLog("使えない。", "muted");
+}
+
+function openGate(){
+  if(S.flags.has("gate_opened")){
+    pushLog("封鎖は既に解除されている。", "muted");
+    return;
+  }
+  if(S.flags.has("has_gate_key") || hasItem("gate_key")){
+    S.flags.add("gate_opened");
+    pushLog("封鎖ゲートが外れた。道が一本通る。<span class='ok'>封鎖解除</span>", "ok");
+  }else{
+    pushLog("鍵がない。資材庫を探れ。", "muted");
+  }
+}
+
+function tryEscape(){
+  const need = ["route_confirmed","ship_repaired","gate_opened"];
+  const miss = need.filter(f=>!S.flags.has(f));
+  if(miss.length){
+    pushLog("出港条件が揃っていない。", "muted");
+    pushLog(`不足：<span class="danger">${miss.join(", ")}</span>`, "danger");
+    return;
+  }
+  if(S.fuel < 30){
+    pushLog("燃料が足りない。", "muted");
+    return;
+  }
+  S.flags.add("escaped_mainland");
+  pushLog("出港する。波を割り、島影が遠ざかる。", "ok");
+}
+
+function hasItem(it){ return S.inventory.includes(it); }
+function addItem(it, silent=false){
+  if(S.inventory.includes(it)) return;
+  if(S.inventory.length >= S.invLimit){
+    pushLog("（所持枠がいっぱいだ）", "danger");
+    return;
+  }
+  S.inventory.push(it);
+  if(!silent) pushLog(`（入手：${ITEMS[it]?.name ?? it}）`, "muted");
+}
+function removeItem(it){
+  const i=S.inventory.indexOf(it);
+  if(i>=0) S.inventory.splice(i,1);
+}
+
+/* =========
+   Traps + Pressure + Endings
+========= */
+function trapCheck(){
+  // 場所危険+警戒で抽選
+  const base = LOC[S.location].danger + Math.floor(S.alert/8);
+  const p = clamp(3 + base/2, 0, 35); // 最大35%くらい
+  if(!chance(p)) return;
+
+  const pool=[
+    ()=>{ S.flags.add("detected_once"); S.alert=clamp(S.alert+10); pushLog("足音が増えた。<span class='danger'>検知</span>", "danger"); },
+    ()=>{ S.alert=clamp(S.alert+8); pushLog("停電。影が濃くなる。", "muted"); },
+    ()=>{ S.flags.add("detected_once"); S.alert=clamp(S.alert+14); pushLog("警報が一瞬だけ鳴る。<span class='danger'>検知</span>", "danger"); },
+    ()=>{ S.fuel=Math.max(0,S.fuel-4); pushLog("燃料が減っている…気のせいじゃない。<span class='danger'>Fuel-4</span>", "danger"); },
+    ()=>{ pushLog("疑いの視線が刺さる。", "muted"); if(chance(55)){S.flags.add("detected_once"); S.alert=clamp(S.alert+8); pushLog("気配が割れた。<span class='danger'>検知</span>", "danger");} },
+  ];
+  pool[rint(pool.length)]();
+}
+
+function pressureCheck(){
+  if(S.turn > 90 && chance(12)){
+    pushLog("長引きすぎた。包囲が締まる。", "danger");
+    S.flags.add("time_over");
+  }
+  if(S.alert>=100){
+    S.flags.add("captured");
+  }
+}
+
+function resolveEnding(){
+  const escaped = S.flags.has("escaped_mainland");
+  const failed = S.flags.has("captured") || S.flags.has("time_over");
+  const neverDetected = !S.flags.has("detected_once");
+
+  const [b,all]=bondedCount();
+  const allBonded = (all>0 && b===all);
+
+  if(allBonded && (escaped || failed)) return "king";
+  if(b>=5 && (escaped || failed)) return "harem";
+  if(escaped && neverDetected) return "dream";
+  if(escaped) return "normal";
+  if(failed) return "bad";
+  return null;
+}
+
+function endGame(id){
+  S.ended=true;
+  S.ending=id;
+  sep();
+  pushLog(`<b>${END[id]}</b>`, id==="bad" ? "danger":"ok");
+  pushLog(`<span class="muted small">MENU → 最初から / ロード で再開できます。</span>`, "muted");
+}
+
+function afterStep(){
+  // その場に艦娘が「必ず会える」ように、たまに更新
+  if(!S.present.length || chance(22)) refreshPresent(true);
+
+  trapCheck();
+  pressureCheck();
+
+  // エンド判定
+  const e = resolveEnding();
+  if(e) endGame(e);
+
+  renderTop();
+}
+
+/* =========
+   UI Setup
+========= */
+function buildCmdButtons(){
+  cmdGrid.innerHTML = CMD.map(c=>`<button data-c="${c.id}">${c.label}</button>`).join("");
+  cmdGrid.querySelectorAll("button").forEach(b=>{
+    b.onclick=()=>openTarget(b.dataset.c);
+  });
+}
+buildCmdButtons();
+
+/* =========
+   Save / Load / Restart
+========= */
+function serialize(){
+  return {
+    seed:S.seed,
+    turn:S.turn, alert:S.alert, fuel:S.fuel, ammo:S.ammo,
+    location:S.location, present:[...S.present],
+    inventory:[...S.inventory], invLimit:S.invLimit,
+    flags:[...S.flags],
+    chars:S.chars,
+    log:S.log,
+    ended:S.ended, ending:S.ending
+  };
+}
+function hydrate(obj){
+  seed = obj.seed ?? seed;
+  rnd = mulberry32(seed);
+  S = defaultState();
+  S.seed = seed;
+  S.turn=obj.turn??0; S.alert=obj.alert??10; S.fuel=obj.fuel??25; S.ammo=obj.ammo??20;
+  S.location=obj.location??"hq";
+  S.present=obj.present??[];
+  S.inventory=obj.inventory??[];
+  S.invLimit=obj.invLimit??8;
+  S.flags=new Set(obj.flags??[]);
+  S.chars=obj.chars??S.chars;
+  S.log=obj.log??[];
+  S.ended=!!obj.ended; S.ending=obj.ending??null;
+  resetLogFromState();
+  renderTop();
+}
+
+function newGame(keepSeed=false){
+  if(!keepSeed){
+    seed = (Date.now()>>>0) ^ 0xC0FFEE;
+  }
+  rnd = mulberry32(seed);
+  S = defaultState();
+  S.seed = seed;
+  // opening
+  pushLog("—— <b>離島鎮守府</b> ——");
+  pushLog("夜の潮が重い。ここを抜け、本土へ辿り着け。<br><span class='muted'>（航路/鍵/整備/封鎖解除 → 埠頭で出港）</span>");
+  enterLocation("hq");
+  renderTop();
+}
+
+function saveLocal(){
+  localStorage.setItem("island_escape_save", JSON.stringify(serialize()));
+  toast("セーブしました");
+}
+function loadLocal(){
+  const raw = localStorage.getItem("island_escape_save");
+  if(!raw){ toast("セーブがありません"); return; }
+  hydrate(JSON.parse(raw));
+  toast("ロードしました");
+}
+
+document.getElementById("btnMenu").onclick=()=>document.getElementById("menuWrap").classList.add("show");
+document.getElementById("menuClose").onclick=()=>document.getElementById("menuWrap").classList.remove("show");
+document.getElementById("btnSave").onclick=saveLocal;
+document.getElementById("btnLoad").onclick=loadLocal;
+document.getElementById("btnRestart").onclick=()=>{
+  document.getElementById("menuWrap").classList.remove("show");
+  newGame(false);
+};
+document.getElementById("btnReplay").onclick=()=>{
+  document.getElementById("menuWrap").classList.remove("show");
+  // seed保持で同条件
+  const keep = S.seed;
+  seed = keep;
+  rnd = mulberry32(seed);
+  S = defaultState();
+  S.seed = seed;
+  pushLog("—— <b>離島鎮守府</b> ——");
+  pushLog("同じ潮、同じ夜。違う一手で抜けろ。<br><span class='muted'>（同条件リプレイ）</span>");
+  enterLocation("hq");
+  renderTop();
+};
+
+document.getElementById("modalWrap").addEventListener("click",(e)=>{
+  if(e.target.id==="modalWrap") closeTarget();
+});
+document.getElementById("menuWrap").addEventListener("click",(e)=>{
+  if(e.target.id==="menuWrap") document.getElementById("menuWrap").classList.remove("show");
+});
+
+/* =========
+   Start
+========= */
+newGame(false);
 </script>
 </body>
 </html>
