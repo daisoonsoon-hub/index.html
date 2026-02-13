@@ -3,13 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>離島鎮守府 脱出行（PWA 1file v3）</title>
+<title>離島鎮守府 脱出行（基礎コード / セクション分け版）</title>
 <style>
   :root{
     --bg:#0e0f12; --panel:#171a20; --panel2:#12141a; --line:#2a2f3a;
     --txt:#e9edf4; --muted:#a9b2c3; --accent:#69c0ff; --danger:#ff6b6b; --ok:#7CFF7C;
-    --btn:#232836; --btn2:#2b3142;
-    --r:14px;
+    --btn:#232836; --btn2:#2b3142; --r:14px;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif}
@@ -61,10 +60,11 @@
   .toast.show{display:block}
 </style>
 </head>
+
 <body>
 <header>
-  <div class="title">離島鎮守府 脱出行</div>
-  <div class="sub">コマンド→対象選択 / “脱走疑い”が立つと捕縛行動 / 会話は選択式 / 出現時に「気づき」を明示</div>
+  <div class="title">離島鎮守府 脱出行（基礎コード / セクション分け版）</div>
+  <div class="sub">修正しやすいように「定数→状態→UI→遭遇→各コマンド→会話データ」の順に整理</div>
 </header>
 
 <main>
@@ -79,7 +79,7 @@
     </div>
 
     <div class="bd">
-      <div class="sceneImg" title="背景（後で差し替え可）"><img id="sceneImg" alt="scene"></div>
+      <div class="sceneImg"><img id="sceneImg" alt="scene"></div>
       <div class="hr"></div>
 
       <div class="grid2">
@@ -124,7 +124,7 @@
   </div>
 </main>
 
-<!-- Target Modal -->
+<!-- 対象選択モーダル -->
 <div class="modalWrap" id="targetWrap">
   <div class="modal">
     <div class="top">
@@ -139,16 +139,14 @@
   </div>
 </div>
 
-<!-- Dialogue Modal -->
+<!-- 返答選択モーダル（NPC台詞はログに確定／返答だけ選ぶ） -->
 <div class="modalWrap" id="dlgWrap">
   <div class="modal">
     <div class="top">
-      <div class="t" id="dlgTitle">会話</div>
+      <div class="t" id="dlgTitle">返答</div>
       <button class="x" id="dlgClose">閉じる</button>
     </div>
     <div class="body">
-      <div id="dlgNpcLine" style="font-weight:850"></div>
-      <div class="hr"></div>
       <div class="small muted" id="dlgHint"></div>
       <div class="hr"></div>
       <div class="grid2" id="dlgChoices"></div>
@@ -156,7 +154,7 @@
   </div>
 </div>
 
-<!-- Menu Modal -->
+<!-- メニュー -->
 <div class="modalWrap" id="menuWrap">
   <div class="modal">
     <div class="top">
@@ -182,19 +180,25 @@
 <div class="toast" id="toast"></div>
 
 <script>
-/* =========================
-   Commands
-========================= */
+/* =========================================================
+   00) ここが「入口」：全部を一つの App にまとめる
+========================================================= */
+const App = (() => {
+
+/* =========================================================
+   01) 定数（世界データ）
+   - ここを増やす：場所 / 艦娘 / アイテム / コマンド
+========================================================= */
 const CMD = [
   {id:"move", label:"移動", hint:"移動先を選ぶ"},
   {id:"examine", label:"調べる", hint:"場所/物/人物を調べる（調べるほど対象が増える）"},
   {id:"touch", label:"触る", hint:"装置/扉/人物に触れる"},
-  {id:"hide", label:"隠れる", hint:"見られている時の回避（疑いが立つことも）"},
+  {id:"hide", label:"隠れる", hint:"回避（見られてる時は怪しまれることも）"},
   {id:"pickup", label:"拾う", hint:"発見済みの物だけ拾える（有限）"},
   {id:"drop", label:"捨てる", hint:"所持枠整理"},
-  {id:"talk", label:"話す", hint:"会話→提督の返答選択（信頼/親密/疑いに影響）"},
+  {id:"talk", label:"話す", hint:"対象選択→NPC台詞はログ確定→返答だけ選ぶ"},
   {id:"use", label:"使う", hint:"アイテム/装置に使う"},
-  {id:"order", label:"命令", hint:"同行/指示など。信頼が低いと反発"},
+  {id:"order", label:"命令", hint:"同行/指示。信頼が低いと反発"},
   {id:"run", label:"逃げる", hint:"露骨な離脱行動（疑いが濃くなる）"},
   {id:"apologize", label:"謝る", hint:"空気を戻す（場面によって有効/無効）"},
   {id:"fight", label:"闘う", hint:"交戦。疑いは確定する"},
@@ -212,7 +216,7 @@ const CHAR = {
   hibiki:{name:"響"},
 };
 
-// 画像（内蔵SVG。あとで差し替え可）
+// 内蔵の簡易背景（あとで画像に差し替え可）
 function svgScene(title, a="#0b1020", b="#131a2d", accent="#69c0ff"){
   const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600">
@@ -276,9 +280,9 @@ const END = {
   dream:"【胡蝶の夢提督エンド】一度も疑われず、静かに渡り切った。",
 };
 
-/* =========================
-   RNG
-========================= */
+/* =========================================================
+   02) 乱数（seed つき）
+========================================================= */
 function mulberry32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;}}
 let seed = (Date.now()>>>0) ^ 0xA5A5A5A5;
 let rnd = mulberry32(seed);
@@ -286,9 +290,10 @@ const rint = (n)=>Math.floor(rnd()*n);
 const chance = (p)=>rnd()*100 < p;
 const clamp=(v,min=0,max=100)=>Math.max(min,Math.min(max,v));
 
-/* =========================
-   State
-========================= */
+/* =========================================================
+   03) 状態（ゲーム進行のデータ）
+   - 新しい要素は S の中に足す
+========================================================= */
 function defaultState(){
   const chars = {};
   Object.keys(CHAR).forEach(id=>{
@@ -300,8 +305,8 @@ function defaultState(){
     locState[lid] = {
       examined:new Set(),
       touched:new Set(),
-      revealed:new Set(),
-      depleted:new Set(),
+      revealed:new Set(),  // "item:xxx" / "sub:xxx"
+      depleted:new Set(),  // 取り切った箱など
     };
   });
 
@@ -312,10 +317,10 @@ function defaultState(){
     fuel:25,
     inventory:[], invLimit:8,
     location:"hq",
-    present:[],          // [{id, noticed:boolean}]
-    party:[],            // [id...]
-    suspect:false,       // 脱走疑い（立ったら艦娘は捕縛/制止に寄る）
-    flags:new Set(),     // route_confirmed ship_repaired has_gate_key gate_opened escaped_mainland captured ...
+    present:[],         // [{id, noticed:boolean}]
+    party:[],           // [id...]
+    suspect:false,      // 脱走疑い（立ったら制止/捕縛が発生）
+    flags:new Set(),    // route_confirmed ship_repaired has_gate_key gate_opened escaped_mainland captured ...
     chars,
     locState,
     log:[],
@@ -325,26 +330,45 @@ function defaultState(){
 }
 let S = defaultState();
 
-/* =========================
-   UI helpers
-========================= */
-const logEl = document.getElementById("log");
+/* =========================================================
+   04) DOM/UI（描画とログ）
+========================================================= */
+const el = {
+  log: document.getElementById("log"),
+  placeName: document.getElementById("placeName"),
+  turn: document.getElementById("turn"),
+  alert: document.getElementById("alert"),
+  fuel: document.getElementById("fuel"),
+  suspect: document.getElementById("suspect"),
+  objective: document.getElementById("objective"),
+  situation: document.getElementById("situation"),
+  present: document.getElementById("present"),
+  party: document.getElementById("party"),
+  inv: document.getElementById("inv"),
+  sceneImg: document.getElementById("sceneImg"),
+  chars: document.getElementById("chars"),
+  cmdGrid: document.getElementById("cmdGrid"),
+  toast: document.getElementById("toast"),
+};
+
 function pushLog(line, cls=""){
   const div=document.createElement("div");
   if(cls) div.className=cls;
   div.innerHTML=line;
-  logEl.appendChild(div);
-  logEl.scrollTop = logEl.scrollHeight + 9999;
+  el.log.appendChild(div);
+  el.log.scrollTop = el.log.scrollHeight + 9999;
   S.log.push({line,cls});
   if(S.log.length>320) S.log.shift();
 }
 function sep(){ pushLog('<div class="sep"></div>'); }
 function toast(msg){
-  const t=document.getElementById("toast");
-  t.textContent=msg;
-  t.classList.add("show");
-  setTimeout(()=>t.classList.remove("show"), 1200);
+  el.toast.textContent=msg;
+  el.toast.classList.add("show");
+  setTimeout(()=>el.toast.classList.remove("show"), 1100);
 }
+
+function stripHtml(s){ return (s||"").replace(/<[^>]*>/g,""); }
+
 function bondedCount(){
   const ids=Object.keys(S.chars);
   const b=ids.filter(id=>S.chars[id].bonded).length;
@@ -375,19 +399,16 @@ function presentText(){
     return `<b>${CHAR[o.id].name}</b>${n}`;
   }).join(" / ");
 }
-
 function partyText(){
   if(!S.party.length) return `<span class="muted">—</span>`;
   return S.party.map(id=>`<b>${CHAR[id].name}</b>`).join(" / ");
 }
-
 function invText(){
   if(!S.inventory.length) return `<span class="muted">なし</span>`;
   return S.inventory.map(it=>`<span class="pill"><b>${ITEMS[it]?.name ?? it}</b></span>`).join(" ");
 }
 
 function renderChars(){
-  const box=document.getElementById("chars");
   const ids=Object.keys(S.chars);
   const rows=ids.map(id=>{
     const c=S.chars[id];
@@ -403,27 +424,57 @@ function renderChars(){
       </div>
     `;
   }).join("");
-  box.innerHTML = `<div>${rows}</div>`;
+  el.chars.innerHTML = `<div>${rows}</div>`;
 }
 
 function renderTop(){
-  document.getElementById("placeName").textContent = LOC[S.location].name;
-  document.getElementById("turn").textContent = S.turn;
-  document.getElementById("alert").textContent = S.alert;
-  document.getElementById("fuel").textContent = S.fuel;
-  document.getElementById("suspect").textContent = S.suspect ? "あり" : "なし";
-  document.getElementById("objective").innerHTML = objectiveText();
-  document.getElementById("situation").innerHTML = situationText();
-  document.getElementById("present").innerHTML = presentText();
-  document.getElementById("party").innerHTML = partyText();
-  document.getElementById("inv").innerHTML = invText();
-  document.getElementById("sceneImg").src = LOC[S.location].img();
+  el.placeName.textContent = LOC[S.location].name;
+  el.turn.textContent = S.turn;
+  el.alert.textContent = S.alert;
+  el.fuel.textContent = S.fuel;
+  el.suspect.textContent = S.suspect ? "あり" : "なし";
+  el.objective.innerHTML = objectiveText();
+  el.situation.innerHTML = situationText();
+  el.present.innerHTML = presentText();
+  el.party.innerHTML = partyText();
+  el.inv.innerHTML = invText();
+  el.sceneImg.src = LOC[S.location].img();
   renderChars();
 }
 
-/* =========================
-   Encounter (present)
-========================= */
+/* =========================================================
+   05) ユーティリティ（所持品・フラグ・locState）
+========================================================= */
+function LS(){ return S.locState[S.location]; }
+function hasItem(it){ return S.inventory.includes(it); }
+function addItem(it){
+  if(S.inventory.includes(it)) return;
+  if(S.inventory.length >= S.invLimit){ pushLog("（所持枠がいっぱいだ）", "danger"); return; }
+  S.inventory.push(it);
+  pushLog(`（入手：${ITEMS[it]?.name ?? it}）`, "muted");
+}
+function removeItem(it){
+  const i=S.inventory.indexOf(it);
+  if(i>=0) S.inventory.splice(i,1);
+}
+function reveal(x){ LS().revealed.add(x); }
+function examined(x){ LS().examined.add(x); }
+function touched(x){ LS().touched.add(x); }
+function depleted(x){ LS().depleted.add(x); }
+
+function setSuspect(reason){
+  if(S.suspect) return;
+  S.suspect = true;
+  pushLog(`空気が変わる。<span class="danger">脱走を疑われた</span>。<span class="muted">（${reason}）</span>`, "danger");
+}
+function isSomeoneNoticed(){
+  return S.present.some(o=>o.noticed);
+}
+
+/* =========================================================
+   06) 遭遇（出現/気づき）
+   - “話したのに気づきが戻る”バグ対策済み：既存は noticed 保持
+========================================================= */
 function locationPool(loc){
   const all=Object.keys(CHAR);
   const bias={
@@ -444,34 +495,28 @@ function locationPool(loc){
   }[loc] || [];
   return [...bias, ...all, ...bias];
 }
-
-// “気づき”は：警戒と場所で決まる。疑いがあると気づきやすい。
 function calcNoticedChance(){
   const base = 10 + Math.floor(S.alert/8) + (S.suspect?18:0);
   return clamp(base, 5, 70);
 }
-
 function refreshPresent(force=false){
   const pool = locationPool(S.location);
 
-  // 既存の出現（同行は除外）を保持
+  // 既存を保持（noticed を維持）
   const existing = new Map();
   S.present.forEach(o=>{
     if(!S.party.includes(o.id)) existing.set(o.id, {id:o.id, noticed:!!o.noticed});
   });
 
-  // 目標人数
   let count = chance(55)?2:1;
   if(force) count = Math.max(1, count);
 
-  // まず既存を優先採用（最大countまで）
   const next = [];
   for(const o of existing.values()){
     if(next.length>=count) break;
     next.push({id:o.id, noticed:o.noticed});
   }
 
-  // 足りない分だけ新規追加
   for(let k=0;k<80 && next.length<count;k++){
     const id = pool[rint(pool.length)];
     if(S.party.includes(id)) continue;
@@ -479,11 +524,10 @@ function refreshPresent(force=false){
     next.push({id, noticed:false});
   }
 
-  // 新規だけ気づき抽選。既存のnoticedは維持（話したら戻らない）
   const p = calcNoticedChance();
   next.forEach(o=>{
-    if(existing.has(o.id)) return;        // 既存は保持
-    o.noticed = chance(p);                // 新規のみ抽選
+    if(existing.has(o.id)) return; // 既存は保持
+    o.noticed = chance(p);         // 新規だけ抽選
   });
 
   S.present = next;
@@ -497,7 +541,6 @@ function enterLocation(loc){
   pushLog(`—— <b>${LOC[loc].name}</b> ——`);
   pushLog(`<span class="muted">${LOC[loc].situation[rint(LOC[loc].situation.length)]}</span>`);
 
-  // 出現演出（臨場感）
   if(S.present.length){
     const names = S.present.map(o=>CHAR[o.id].name).join("、");
     pushLog(`${names}がいるようだ。`, "muted");
@@ -508,58 +551,110 @@ function enterLocation(loc){
   }else{
     pushLog("この場所には、今は誰もいない。", "muted");
   }
+
   renderTop();
 }
 
-/* =========================
-   Command UI
-========================= */
-const cmdGrid=document.getElementById("cmdGrid");
-const targetWrap=document.getElementById("targetWrap");
-const targetTitle=document.getElementById("targetTitle");
-const targetHint=document.getElementById("targetHint");
-const targetGrid=document.getElementById("targetGrid");
-document.getElementById("targetClose").onclick=()=>closeTarget();
-let pendingCmd=null;
+/* =========================================================
+   07) 対象選択UI（コマンド→対象の一覧）
+========================================================= */
+const targetUI = (() => {
+  const wrap=document.getElementById("targetWrap");
+  const title=document.getElementById("targetTitle");
+  const hint=document.getElementById("targetHint");
+  const grid=document.getElementById("targetGrid");
+  const closeBtn=document.getElementById("targetClose");
 
-function buildCmdButtons(){
-  cmdGrid.innerHTML = CMD.map(c=>`<button data-c="${c.id}">${c.label}</button>`).join("");
-  cmdGrid.querySelectorAll("button").forEach(b=>{
-    b.onclick=()=>openTarget(b.dataset.c);
-  });
-}
-buildCmdButtons();
+  let pendingCmd=null;
 
-function openTarget(cmdId){
-  if(S.ended) return toast("エンド後はMENUからやり直し");
-  pendingCmd = cmdId;
-  const cmd = CMD.find(c=>c.id===cmdId);
-  targetTitle.textContent = `対象を選択：${cmd.label}`;
-  targetHint.textContent = cmd.hint;
+  function open(cmdId){
+    if(S.ended) return toast("エンド後はMENUからやり直し");
+    pendingCmd = cmdId;
+    const cmd = CMD.find(c=>c.id===cmdId);
+    title.textContent = `対象を選択：${cmd.label}`;
+    hint.textContent = cmd.hint;
 
-  const targets = buildTargets(cmdId);
-  targetGrid.innerHTML = targets.map(t=>{
-    const dis = t.disabled ? "disabled" : "";
-    return `<button ${dis} data-t="${t.id}">${t.label}${t.tag?`<span class="tag">${t.tag}</span>`:""}</button>`;
-  }).join("");
+    const targets = buildTargets(cmdId);
+    grid.innerHTML = targets.map(t=>{
+      const dis = t.disabled ? "disabled" : "";
+      return `<button ${dis} data-t="${t.id}">${t.label}${t.tag?`<span class="tag">${t.tag}</span>`:""}</button>`;
+    }).join("");
 
-  targetGrid.querySelectorAll("button").forEach(b=>{
-    b.onclick=()=>{ if(!b.disabled) runCommand(pendingCmd, b.dataset.t); };
-  });
+    grid.querySelectorAll("button").forEach(b=>{
+      b.onclick=()=>{ if(!b.disabled) runCommand(pendingCmd, b.dataset.t); };
+    });
 
-  targetWrap.classList.add("show");
-}
-function closeTarget(){
-  targetWrap.classList.remove("show");
-  pendingCmd=null;
-}
-targetWrap.addEventListener("click",(e)=>{
-  if(e.target.id==="targetWrap") closeTarget();
-});
+    wrap.classList.add("show");
+  }
 
+  function close(){
+    wrap.classList.remove("show");
+    pendingCmd=null;
+  }
+
+  closeBtn.onclick=close;
+  wrap.addEventListener("click",(e)=>{ if(e.target.id==="targetWrap") close(); });
+
+  return { open, close };
+})();
+
+/* =========================================================
+   08) 返答選択UI（会話）
+   - NPC台詞はログに確定出力
+   - モーダルは「提督の返答」だけ出す
+========================================================= */
+const dialogueUI = (() => {
+  const wrap=document.getElementById("dlgWrap");
+  const title=document.getElementById("dlgTitle");
+  const hint=document.getElementById("dlgHint");
+  const choices=document.getElementById("dlgChoices");
+  const closeBtn=document.getElementById("dlgClose");
+
+  let after=null;
+
+  function open(npcId, context, afterFn){
+    after = afterFn || null;
+
+    const c = S.chars[npcId];
+    title.textContent = `返答を選択：${c.name}`;
+    hint.textContent = "返答を選ぶ（信頼/親密/疑いが動く）";
+
+    const opts = Dialogue.options(npcId, context);
+    choices.innerHTML = opts.map(o=>{
+      const dis = o.disabled ? "disabled" : "";
+      return `<button ${dis} data-k="${o.key}">${o.label}${o.tag?`<span class="tag">${o.tag}</span>`:""}</button>`;
+    }).join("");
+
+    choices.querySelectorAll("button").forEach(b=>{
+      b.onclick=()=>{
+        if(b.disabled) return;
+        Dialogue.applyChoice(npcId, context, b.dataset.k);
+        wrap.classList.remove("show");
+        if(after){ const fn=after; after=null; fn(); }
+      };
+    });
+
+    wrap.classList.add("show");
+  }
+
+  function close(){
+    wrap.classList.remove("show");
+    after=null;
+  }
+
+  closeBtn.onclick=close;
+  wrap.addEventListener("click",(e)=>{ if(e.target.id==="dlgWrap") close(); });
+
+  return { open, close };
+})();
+
+/* =========================================================
+   09) 対象一覧生成（コマンド別）
+   - 追加/改造が一番多い場所
+========================================================= */
 function buildTargets(cmdId){
   const L=LOC[S.location];
-  const LS=S.locState[S.location];
+  const st=LS();
   const t=[];
 
   if(cmdId==="move"){
@@ -585,10 +680,11 @@ function buildTargets(cmdId){
 
   if(["examine","touch"].includes(cmdId)){
     L.objects.forEach(o=>{
-      const done = LS.examined.has(o) || LS.touched.has(o);
+      const done = st.examined.has(o) || st.touched.has(o);
       t.push({id:`obj:${o}`, label:o, tag:done?"済":"場所"});
     });
-    [...LS.revealed].forEach(r=>{
+
+    [...st.revealed].forEach(r=>{
       if(r.startsWith("sub:")){
         const name=r.slice(4);
         t.push({id:`sub:${name}`, label:name, tag:"発見"});
@@ -607,7 +703,7 @@ function buildTargets(cmdId){
   }
 
   if(cmdId==="pickup"){
-    const items = [...LS.revealed].filter(r=>r.startsWith("item:")).map(r=>r.slice(5));
+    const items = [...st.revealed].filter(r=>r.startsWith("item:")).map(r=>r.slice(5));
     if(!items.length) return [{id:"none", label:"（拾える物がない）"}];
     items.forEach(it=>t.push({id:`pick:${it}`, label:ITEMS[it]?.name ?? it, tag:"拾う"}));
     return t;
@@ -617,7 +713,10 @@ function buildTargets(cmdId){
     if(S.inventory.length){
       S.inventory.forEach(it=>t.push({id:`it:${it}`, label:ITEMS[it]?.name ?? it, tag:"所持"}));
     }
-    if(S.location==="dock"){ t.push({id:"use:gate", label:"封鎖ゲートに使う", tag:"解除"}); t.push({id:"use:ship", label:"輸送船を動かす", tag:"脱出"}); }
+    if(S.location==="dock"){
+      t.push({id:"use:gate", label:"封鎖ゲートに使う", tag:"解除"});
+      t.push({id:"use:ship", label:"輸送船を動かす", tag:"脱出"});
+    }
     if(S.location==="radio") t.push({id:"use:radio", label:"無線照合を進める", tag:"航路"});
     if(S.location==="workshop") t.push({id:"use:repair", label:"整備を進める", tag:"整備"});
     return t.length? t : [{id:"none", label:"（使えるものがない）"}];
@@ -645,345 +744,442 @@ function buildTargets(cmdId){
   return [{id:"none", label:"（対象なし）"}];
 }
 
-/* =========================
-   Inventory & Flags
-========================= */
-function hasItem(it){ return S.inventory.includes(it); }
-function addItem(it){
-  if(S.inventory.includes(it)) return;
-  if(S.inventory.length >= S.invLimit){ pushLog("（所持枠がいっぱいだ）", "danger"); return; }
-  S.inventory.push(it);
-  pushLog(`（入手：${ITEMS[it]?.name ?? it}）`, "muted");
-}
-function removeItem(it){
-  const i=S.inventory.indexOf(it);
-  if(i>=0) S.inventory.splice(i,1);
-}
-
-function setSuspect(reason){
-  if(S.suspect) return;
-  S.suspect = true;
-  pushLog(`空気が変わる。<span class="danger">脱走を疑われた</span>。<span class="muted">（${reason}）</span>`, "danger");
-}
-
-function isSomeoneNoticed(){
-  return S.present.some(o=>o.noticed);
-}
-
-/* =========================
-   Location-state helpers
-========================= */
-function LS(){ return S.locState[S.location]; }
-function reveal(x){ LS().revealed.add(x); }
-function examined(x){ LS().examined.add(x); }
-function touched(x){ LS().touched.add(x); }
-function depleted(x){ LS().depleted.add(x); }
-
-/* =========================
-   Dialogue (talk selection)
-========================= */
-const dlgWrap = document.getElementById("dlgWrap");
-const dlgTitle = document.getElementById("dlgTitle");
-const dlgNpcLine = document.getElementById("dlgNpcLine");
-const dlgHint = document.getElementById("dlgHint");
-const dlgChoices = document.getElementById("dlgChoices");
-document.getElementById("dlgClose").onclick=()=>dlgWrap.classList.remove("show");
-dlgWrap.addEventListener("click",(e)=>{ if(e.target.id==="dlgWrap") dlgWrap.classList.remove("show"); });
-
-let pendingAfterDialogue = null;
-
-function openDialogue(npcId, context, npcLineText){
-  const c = S.chars[npcId];
-  dlgTitle.textContent = `返答を選択：${c.name}`;
-  dlgHint.textContent = "提督の返答を選ぶ（選択で信頼/親密/疑いが動く）";
-
-  const opts = dialogueOptions(npcId, context);
-  dlgChoices.innerHTML = opts.map(o=>{
-    const dis = o.disabled ? "disabled" : "";
-    return `<button ${dis} data-k="${o.key}">${o.label}${o.tag?`<span class="tag">${o.tag}</span>`:""}</button>`;
-  }).join("");
-
-  dlgChoices.querySelectorAll("button").forEach(b=>{
-    b.onclick=()=>{
-      if(b.disabled) return;
-      applyDialogueChoice(npcId, context, b.dataset.k);
-      dlgWrap.classList.remove("show");
-      if(pendingAfterDialogue){ pendingAfterDialogue(); pendingAfterDialogue=null; }
-    };
-  });
-
-  dlgWrap.classList.add("show");
-}
-
-function npcLine(id, context){
-  const suspect = S.suspect;
-  const noticed = context.noticed;
-  const base = {
-    shigure: suspect ? "時雨「……提督。行き先を、聞いていい？」" : (noticed?"時雨「提督。夜更かし？」":"時雨「……誰かいるの？」"),
-    asashio: suspect ? "朝潮「提督。行動理由を確認します」" : (noticed?"朝潮「提督。こんな時間に？」":"朝潮「……気配が…」"),
-    kasumi: suspect ? "霞「はぁ？また逃げる気？」" : (noticed?"霞「今夜は落ち着きないわね」":"霞「……誰かいるの？」"),
-    takao: suspect ? "高雄「提督。動きが不自然です。説明を」" : (noticed?"高雄「提督。お疲れですか」":"高雄「……そこですか？」"),
-    kongo: suspect ? "金剛「提督！Stop！どこ行くのネ！」" : (noticed?"金剛「Hey提督！眠れない？」":"金剛「誰かいるヨ！」"),
-    hatsuzuki: suspect ? "初月「提督。目的を言え」" : (noticed?"初月「提督。行動が多い」":"初月「……誰だ」"),
-    urakaze: suspect ? "浦風「提督…無茶したらいけんよ」" : (noticed?"浦風「提督、寒うない？」":"浦風「…提督？」"),
-    ikazuchi: suspect ? "雷「提督！待って！どこ行くの！？」" : (noticed?"雷「提督、元気ない？」":"雷「えっ、誰？」"),
-    hibiki: suspect ? "響「……止まれ」" : (noticed?"響「……夜だ」":"響「……気配」"),
-  }[id];
-
-  // まだ気づいてない場合は「声かける」ニュアンスに寄せる
-  if(!noticed) return base + "（こちらに気づいていない。声をかければ向く）";
-  return base;
-}
-
-function dialogueOptions(id, context){
-  const c=S.chars[id];
-  const noticed=context.noticed;
-  const opts = [];
-
-  // 共通：無難 / 誤魔化し / 正直 / 退く
-  opts.push({key:"neutral", label:"「ちょっと見回りだ」", tag:"無難"});
-  opts.push({key:"lie", label:"「眠れなくて散歩してた」", tag:"誤魔化す"});
-  opts.push({key:"back", label:"「悪い、戻る」", tag:"退く"});
-
-  // 気づかれてない時：先に「声をかける/やり過ごす」
-  if(!noticed){
-    opts.unshift({key:"pass", label:"気づかれないようにやり過ごす", tag:"静かに"});
-    opts.unshift({key:"call", label:"声をかける", tag:"接触"});
-  }
-
-  // 信頼高め：同行提案
-  if(c.trust>=70 && !S.party.includes(id)){
-    opts.push({key:"join", label:"「一緒に来てくれ」", tag:"同行"});
-  }
-
-  // 疑いが立ってる：謝罪/説明系を強化
-  if(S.suspect){
-    opts.push({key:"explain", label:"「誤解だ。理由がある」", tag:"説明"});
-    opts.push({key:"apologize", label:"「疑わせたならすまない」", tag:"謝る"});
-  }
-
-  // 親密が上がってる：距離を詰める（※露骨な表現はここでは入れない）
-  if(c.intimacy>=30){
-    opts.push({key:"soft", label:"「心配してくれて助かる」", tag:"距離を詰める"});
-  }
-
-  return opts;
-}
-
-function applyDialogueChoice(id, context, key){
-  const c=S.chars[id];
-  c.met=true;
-
-  // 会話ログ：艦娘 → 提督選択
-  pushLog(`<b>${c.name}</b>：${stripHtml(dlgNpcLine.textContent)}`);
-  const say = (txt)=>pushLog(`<span class="muted">提督</span>：「${txt}」`);
-
-  // 選択の効果
-  if(key==="pass"){
-    say("（息を殺してやり過ごす）");
-    // 成功率：警戒が低いほど成功
-    const p = clamp(65 - Math.floor(S.alert/2) - (S.suspect?20:0), 10, 70);
-    if(chance(p)){
-      pushLog("足音が遠ざかった。", "ok");
-      S.alert = clamp(S.alert-2);
-      return;
-    }else{
-      pushLog(`${c.name}がこちらに気づいた。`, "danger");
-      // 気づかれたら noticed 化
-      const obj = S.present.find(o=>o.id===id);
-      if(obj) obj.noticed=true;
-      S.alert = clamp(S.alert+6);
-      return;
-    }
-  }
-
-  if(key==="call"){
-    say("ちょっといいか。");
-    // 声をかけたら確実に気づく
-    const obj = S.present.find(o=>o.id===id);
-    if(obj) obj.noticed=true;
-    c.trust = clamp(c.trust+1);
-    return;
-  }
-
-  if(key==="neutral"){
-    say("ちょっと見回りだ。");
-    if(S.suspect){
-      // 疑いがあると「見回り」は逆に刺さることがある
-      if(chance(35)){ pushLog(`${c.name}は納得していない。`, "danger"); S.alert=clamp(S.alert+6); }
-      else { pushLog(`${c.name}「……分かった」`, "muted"); c.trust=clamp(c.trust+1); }
-    }else{
-      pushLog(`${c.name}「そう。気をつけて」`, "muted");
-      c.trust=clamp(c.trust+2);
-      c.intimacy=clamp(c.intimacy+2);
-    }
-    return;
-  }
-
-  if(key==="lie"){
-    say("眠れなくて散歩してた。");
-    const lieP = S.suspect ? 55 : 25;
-    if(chance(lieP)){
-      pushLog(`${c.name}「……嘘の匂いがする」`, "danger");
-      S.alert=clamp(S.alert+8);
-      setSuspect("言い訳が不自然");
-      c.trust=clamp(c.trust-3);
-    }else{
-      pushLog(`${c.name}「そう…なら、少し落ち着いて」`, "muted");
-      c.trust=clamp(c.trust+1);
-      c.intimacy=clamp(c.intimacy+3);
-    }
-    return;
-  }
-
-  if(key==="back"){
-    say("悪い、戻る。");
-    pushLog(`${c.name}は短く頷いた。`, "muted");
-    S.alert = clamp(S.alert-3);
-    c.trust = clamp(c.trust+1);
-    return;
-  }
-
-  if(key==="explain"){
-    say("誤解だ。理由がある。");
-    // 説明が通るかは信頼依存
-    const p = clamp(20 + (c.trust-40), 10, 75);
-    if(chance(p)){
-      pushLog(`${c.name}「……話は聞く」`, "ok");
-      S.alert=clamp(S.alert-6);
-      c.trust=clamp(c.trust+3);
-    }else{
-      pushLog(`${c.name}「理由になってない」`, "danger");
-      S.alert=clamp(S.alert+6);
-      c.trust=clamp(c.trust-2);
-    }
-    return;
-  }
-
-  if(key==="apologize"){
-    say("疑わせたならすまない。");
-    pushLog(`${c.name}「……次は気をつけて」`, "muted");
-    S.alert=clamp(S.alert-6);
-    c.trust=clamp(c.trust+4);
-    c.intimacy=clamp(c.intimacy+1);
-    return;
-  }
-
-  if(key==="soft"){
-    say("心配してくれて助かる。");
-    pushLog(`${c.name}は視線を少しだけ和らげた。`, "ok");
-    c.trust=clamp(c.trust+2);
-    c.intimacy=clamp(c.intimacy+6);
-    if(c.intimacy>=100 && !c.bonded){ c.bonded=true; pushLog(`（${c.name}との関係が深くなった）`, "ok"); }
-    return;
-  }
-
-  if(key==="join"){
-    say("一緒に来てくれ。");
-    const p = clamp(30 + (c.trust-60) + Math.floor(c.intimacy/10), 10, 85);
-    if(chance(p)){
-      pushLog(`${c.name}「……分かった。距離は保つ」`, "ok");
-      if(!S.party.includes(id)) S.party.push(id);
-      // 出現から外す
-      S.present = S.present.filter(o=>o.id!==id);
-    }else{
-      pushLog(`${c.name}「今は無理」`, "muted");
-      c.trust=clamp(c.trust-1);
-    }
-    return;
-  }
-}
-
-function stripHtml(s){ return (s||"").replace(/<[^>]*>/g,""); }
-
-/* =========================
-   Core command runner
-========================= */
+/* =========================================================
+   10) コマンド本体（runCommand）
+   - ここは “分岐の交通整理”
+   - 実処理は下の「コマンド処理セクション」へ分ける
+========================================================= */
 function runCommand(cmdId, targetId){
-  closeTarget();
+  targetUI.close();
   if(S.ended) return;
 
   S.turn++;
 
-  // “疑い”が立つのは「怪しい行動」だけ。
-  // ただ移動しただけで疑わない。
-  const suspiciousActions = new Set(["run","fight"]);
-  const noiseActions = new Set(["fight"]);
+  // 警戒の基本増減（ざっくり）
   const baseAlert = {
     fight:+18, run:+10, hide:+4,
     touch:+2, pickup:+1, use:+2, order:+1,
     move:+0, examine:+0, talk:+0, apologize:-1, drop:+0
   }[cmdId] ?? 0;
-
   S.alert = clamp(S.alert + baseAlert);
 
   if(targetId==="none"){
     pushLog("うまくいかない。", "muted");
-    afterStep();
-    return;
+    return afterStep();
   }
 
+  // 移動
   if(cmdId==="move" && targetId.startsWith("loc:")){
     const next=targetId.slice(4);
     pushLog(`移動… <span class="muted">${LOC[next].name}</span>`);
     enterLocation(next);
-    afterStep();
-    return;
+    return afterStep();
   }
 
-  if(cmdId==="examine"){ examineEvent(targetId); afterStep(); return; }
-  if(cmdId==="touch"){ touchEvent(targetId); afterStep(); return; }
-  if(cmdId==="pickup" && targetId.startsWith("pick:")){ pickupEvent(targetId.slice(5)); afterStep(); return; }
-  if(cmdId==="use"){ useEvent(targetId); afterStep(); return; }
+  // 調べる / 触る / 拾う / 使う / 捨てる
+  if(cmdId==="examine") { CmdExamine.handle(targetId); return afterStep(); }
+  if(cmdId==="touch")   { CmdTouch.handle(targetId);   return afterStep(); }
+  if(cmdId==="pickup" && targetId.startsWith("pick:")) { CmdPickup.handle(targetId.slice(5)); return afterStep(); }
+  if(cmdId==="use")     { CmdUse.handle(targetId);     return afterStep(); }
+  if(cmdId==="drop" && targetId.startsWith("drop:")) { CmdDrop.handle(targetId.slice(5)); return afterStep(); }
 
-  // 会話：必ず「会話モーダル→提督選択」にする
-if(cmdId==="talk" && targetId.startsWith("ch:")){
-  const id=targetId.slice(3);
-  const obj = S.present.find(o=>o.id===id);
-
-  // 話しかけた時点で「気づき」は確定
-  if(obj) obj.noticed = true;
-
-  // NPC台詞をログに確定出力
-  const npc = npcLine(id, {noticed:true});
-  pushLog(`<b>${S.chars[id].name}</b>：${stripHtml(npc)}`);
-
-  pendingAfterDialogue = ()=>afterStep();
-  openDialogue(id, {noticed:true}, npc);
-  return;
-}
-
-  // 謝る（単独コマンド）は簡易に「会話」へ寄せる
-  if(cmdId==="apologize" && targetId.startsWith("ch:")){
+  // 会話：対象選択した瞬間に NPC台詞をログへ確定 → 返答だけポップアップ
+  if(cmdId==="talk" && targetId.startsWith("ch:")){
     const id=targetId.slice(3);
-    pendingAfterDialogue = ()=>afterStep();
-    openDialogue(id, {noticed:true, force:"apologize"});
-    return;
+    CmdTalk.begin(id);
+    // 返答選択後に afterStep() を呼ぶ
+    return dialogueUI.open(id, {noticed:true}, afterStep);
   }
 
-  // 命令：その場で処理（同行/反発）
-  if(cmdId==="order" && targetId.startsWith("ch:")){
-    const id=targetId.slice(3);
-    orderEvent(id);
-    afterStep();
-    return;
-  }
-
-  if(cmdId==="hide"){
-    hideEvent(targetId);
-    afterStep();
-    return;
-  }
+  // 命令/隠れる/逃げる/闘う/謝る（必要なら会話に寄せる）
+  if(cmdId==="order" && targetId.startsWith("ch:")){ CmdOrder.handle(targetId.slice(3)); return afterStep(); }
+  if(cmdId==="hide"){ CmdHide.handle(targetId); return afterStep(); }
 
   if(cmdId==="run"){
-    pushLog("距離を取る。背中に視線が刺さる。", "muted");
-    setSuspect("露骨な離脱行動");
-    S.alert = clamp(S.alert + 6);
-    afterStep();
-    return;
+    CmdRun.handle(targetId);
+    return afterStep();
   }
 
   if(cmdId==="fight"){
+    CmdFight.handle(targetId);
+    return afterStep();
+  }
+
+  if(cmdId==="apologize" && targetId.startsWith("ch:")){
+    // 謝るは「会話の一種」にしてもOK。いまは簡易に talk と同じ流れへ寄せる。
+    const id=targetId.slice(3);
+    CmdTalk.begin(id, {force:"apologize"});
+    return dialogueUI.open(id, {noticed:true, force:"apologize"}, afterStep);
+  }
+
+  pushLog("うまくいかない。", "muted");
+  return afterStep();
+}
+
+/* =========================================================
+   11) コマンド処理セクション（各コマンドの中身）
+   - ここを“深く”していくと味が出る
+========================================================= */
+const CmdExamine = {
+  handle(targetId){
+    if(targetId.startsWith("ch:")){
+      const id=targetId.slice(3);
+      const c=S.chars[id];
+      c.met=true;
+      pushLog(`${c.name}の様子を窺う。`, "muted");
+      const obj = S.present.find(o=>o.id===id);
+      if(obj && !obj.noticed){
+        pushLog(`${c.name}はまだこちらに気づいていない。`, "muted");
+        return;
+      }
+      if(S.suspect && chance(40)){
+        pushLog(`${c.name}「提督…行動が多いです」`, "danger");
+        S.alert = clamp(S.alert+6);
+      }else{
+        pushLog(`${c.name}は短く頷くだけだ。`, "muted");
+      }
+      return;
+    }
+
+    if(targetId.startsWith("obj:")){
+      const obj=targetId.slice(4);
+      examined(obj);
+      pushLog(`調べる：<span class="muted">${obj}</span>`);
+
+      // ---- ここから “場所別の派生” を増やす ----
+      // 資材庫：戸棚→鍵
+      if(S.location==="storage" && obj==="戸棚"){
+        if(!S.flags.has("has_gate_key")){
+          pushLog("鍵束の刻印。封鎖ゲートのものだ。", "ok");
+          reveal("item:gate_key");
+        }else pushLog("空だ。鍵は確保済み。", "muted");
+        return;
+      }
+
+      // 資材庫：木箱→燃料缶（1回）
+      if(S.location==="storage" && obj==="木箱"){
+        if(!LS().depleted.has("fuel_box")){
+          pushLog("木箱の底に、油の匂い。", "muted");
+          reveal("item:fuel_can");
+          depleted("fuel_box");
+        }else pushLog("空箱ばかりだ。", "muted");
+        return;
+      }
+
+      // 無線室：暗号表
+      if(S.location==="radio" && obj==="暗号表の引き出し"){
+        if(!hasItem("codebook") && !LS().depleted.has("codebook")){
+          pushLog("紙束。暗号表だ。", "ok");
+          reveal("item:codebook");
+          depleted("codebook");
+        }else pushLog("もう見当たらない。", "muted");
+        return;
+      }
+
+      // 浴場：脱衣棚→布片、鍵チャンス
+      if(S.location==="bath" && obj==="脱衣棚"){
+        if(!LS().depleted.has("locker")){
+          pushLog("タグ付きの布片。匂いを散らせる。", "ok");
+          reveal("item:cloth_tag");
+          if(!S.flags.has("has_gate_key") && chance(35)){
+            pushLog("奥に小さな鍵束…封鎖の刻印。", "ok");
+            reveal("item:gate_key");
+          }else{
+            pushLog("鍵の痕跡はあるが、確証は薄い。", "muted");
+          }
+          depleted("locker");
+        }else pushLog("棚はもう荒らされている。", "muted");
+        return;
+      }
+
+      // 工廠：部品片
+      if(S.location==="workshop" && obj==="予備部材棚"){
+        if(!LS().depleted.has("scrap")){
+          pushLog("使えそうな部材。整備に回せる。", "ok");
+          reveal("item:scrap");
+          depleted("scrap");
+        }else pushLog("役立つ部材はもうない。", "muted");
+        return;
+      }
+      // ---- ここまで ----
+
+      pushLog("手掛かりは少ない。", "muted");
+      return;
+    }
+
+    if(targetId.startsWith("sub:")){
+      const sub=targetId.slice(4);
+      examined(sub);
+      pushLog(`さらに調べる：<span class="muted">${sub}</span>`);
+      pushLog("細部まで見ても、得るものは少ない。", "muted");
+    }
+  }
+};
+
+const CmdTouch = {
+  handle(targetId){
+    if(targetId.startsWith("ch:")){
+      const id=targetId.slice(3);
+      const c=S.chars[id];
+      c.met=true;
+      const obj=S.present.find(o=>o.id===id);
+      if(obj && !obj.noticed){
+        pushLog(`${c.name}に近づいた。相手はまだ気づいていない。`, "muted");
+        if(chance(40)){
+          obj.noticed=true;
+          pushLog(`${c.name}がこちらを向いた。`, "danger");
+          S.alert=clamp(S.alert+6);
+        }
+        return;
+      }
+      pushLog(`${c.name}に近づく。`, "muted");
+      if(S.suspect && chance(35)){
+        pushLog(`${c.name}「提督。距離が近い」`, "danger");
+        S.alert=clamp(S.alert+6);
+      }else{
+        pushLog(`${c.name}は一瞬だけ迷う顔をした。`, "muted");
+        c.trust=clamp(c.trust+1);
+        c.intimacy=clamp(c.intimacy+2);
+      }
+      return;
+    }
+
+    if(targetId.startsWith("obj:")){
+      const obj=targetId.slice(4);
+      touched(obj);
+      pushLog(`触る：<span class="muted">${obj}</span>`);
+
+      if(S.location==="radio" && obj==="受信機"){
+        if(!S.flags.has("contact_possible")){
+          pushLog("ノイズの底に符丁。繋がる“窓”がある。", "ok");
+          S.flags.add("contact_possible");
+        }else{
+          pushLog("受信状態を整える。照合へ進めそうだ。", "muted");
+        }
+        return;
+      }
+
+      if(S.location==="dock" && obj==="輸送船"){
+        pushLog("輸送船に手を掛ける。ここから先は“出港”だ。", "muted");
+        if(isSomeoneNoticed() && chance(35)){
+          setSuspect("埠頭での不審行動");
+          S.alert=clamp(S.alert+8);
+        }
+        return;
+      }
+
+      if(S.location==="dock" && obj==="封鎖ゲート"){
+        pushLog("封鎖は堅い。鍵が要る。", "muted");
+        if(isSomeoneNoticed() && chance(35)) setSuspect("封鎖ゲートに干渉");
+        return;
+      }
+
+      if(isSomeoneNoticed() && chance(25)){
+        setSuspect("装置に干渉する姿を見られた");
+        S.alert=clamp(S.alert+6);
+      }
+      return;
+    }
+
+    if(targetId.startsWith("sub:")){
+      pushLog("触れるが、意味は薄い。", "muted");
+    }
+  }
+};
+
+const CmdPickup = {
+  handle(it){
+    const st = LS();
+    if(!st.revealed.has("item:"+it)){
+      pushLog("まだ見つけていない。", "muted");
+      return;
+    }
+    st.revealed.delete("item:"+it);
+
+    if(it==="fuel_can"){
+      pushLog("燃料缶を確保した。<span class='ok'>燃料+8</span>", "ok");
+      S.fuel = Math.max(0, S.fuel + 8);
+      return;
+    }
+
+    if(it==="gate_key"){
+      pushLog("ゲート鍵を確保した。", "ok");
+      S.flags.add("has_gate_key");
+      addItem("gate_key");
+      if(isSomeoneNoticed()) setSuspect("鍵の確保を見られた");
+      else if(chance(15)) setSuspect("鍵の所在が動いた");
+      return;
+    }
+
+    if(it==="codebook"){
+      pushLog("暗号表を確保した。", "ok");
+      addItem("codebook");
+      return;
+    }
+
+    if(it==="scrap"){
+      pushLog("部品片を確保した。", "ok");
+      addItem("scrap");
+      return;
+    }
+
+    if(it==="cloth_tag"){
+      pushLog("タグ付き布片を確保した。", "ok");
+      addItem("cloth_tag");
+      return;
+    }
+
+    addItem(it);
+  }
+};
+
+const CmdUse = {
+  handle(targetId){
+    if(targetId.startsWith("it:")){
+      const it=targetId.slice(3);
+
+      if(it==="scrap"){
+        if(S.location==="workshop"){
+          removeItem("scrap");
+          S.flags.add("ship_repaired");
+          pushLog("部品が噛み合う。機関の息が戻る。<span class='ok'>整備完了</span>", "ok");
+        }else pushLog("工廠で使うべきだ。", "muted");
+        return;
+      }
+
+      if(it==="codebook"){
+        if(S.location==="radio" && S.flags.has("contact_possible")){
+          S.flags.add("route_confirmed");
+          pushLog("暗号表で照合。航路が確定する。<span class='ok'>航路確定</span>", "ok");
+          if(isSomeoneNoticed()) setSuspect("無線照合を見られた");
+          else if(chance(20)) setSuspect("無線の使用履歴");
+        }else pushLog("無線室で照合すべきだ。", "muted");
+        return;
+      }
+
+      if(it==="gate_key"){
+        if(S.location==="dock"){ openGate(); }
+        else pushLog("埠頭の封鎖ゲートで使うべきだ。", "muted");
+        return;
+      }
+
+      if(it==="cloth_tag"){
+        pushLog("布片の匂いを散らす。気配が薄まる。", "muted");
+        S.alert = clamp(S.alert-6);
+        return;
+      }
+
+      pushLog("使い道がない。", "muted");
+      return;
+    }
+
+    if(targetId==="use:radio"){
+      if(S.location!=="radio"){ pushLog("ここでは無線照合ができない。", "muted"); return; }
+      if(!S.flags.has("contact_possible")){ pushLog("まず受信機を確かめる必要がある。", "muted"); return; }
+      if(hasItem("codebook")){
+        S.flags.add("route_confirmed");
+        pushLog("照合が通る。<span class='ok'>航路確定</span>", "ok");
+      }else{
+        if(chance(30)){ S.flags.add("route_confirmed"); pushLog("不安定だが照合に成功。<span class='ok'>航路確定</span>", "ok"); }
+        else pushLog("照合が足りない。暗号表が欲しい。", "muted");
+      }
+      if(isSomeoneNoticed()) setSuspect("無線照合を見られた");
+      else if(chance(20)) setSuspect("無線の使用履歴");
+      return;
+    }
+
+    if(targetId==="use:repair"){
+      if(S.location!=="workshop"){ pushLog("ここでは整備ができない。", "muted"); return; }
+      if(S.flags.has("ship_repaired")){ pushLog("整備は完了している。", "muted"); return; }
+      if(hasItem("scrap")){
+        removeItem("scrap");
+        S.flags.add("ship_repaired");
+        pushLog("整備が通る。<span class='ok'>整備完了</span>", "ok");
+      }else pushLog("部品が足りない。部品片が必要だ。", "muted");
+      return;
+    }
+
+    if(targetId==="use:gate"){ if(S.location!=="dock"){ pushLog("ここでは封鎖ゲートがない。", "muted"); return; } openGate(); return; }
+    if(targetId==="use:ship"){ if(S.location!=="dock"){ pushLog("ここでは出港できない。", "muted"); return; } tryEscape(); return; }
+
+    pushLog("使えない。", "muted");
+  }
+};
+
+const CmdDrop = {
+  handle(it){
+    removeItem(it);
+    pushLog(`（破棄：${ITEMS[it]?.name ?? it}）`, "muted");
+  }
+};
+
+const CmdTalk = {
+  // 対象を選んだ瞬間に「NPC台詞をログへ確定」
+  begin(id, ctx={}){
+    const obj = S.present.find(o=>o.id===id);
+    if(obj) obj.noticed = true; // 話しかけた＝気づき確定
+    S.chars[id].met = true;
+
+    const npc = Dialogue.npcLine(id, {noticed:true, ...ctx});
+    pushLog(`<b>${S.chars[id].name}</b>：${stripHtml(npc)}`);
+  }
+};
+
+const CmdOrder = {
+  handle(id){
+    const c=S.chars[id];
+    c.met=true;
+
+    pushLog(`${c.name}に命令する。`, "muted");
+
+    const p = clamp(10 + (c.trust-40), 5, 80);
+    if(chance(p)){
+      if(!S.party.includes(id)){
+        pushLog(`${c.name}「了解。…ただし、提督」`, "muted");
+        pushLog(`${c.name}「変なことをするなら止めます」`, S.suspect?"danger":"muted");
+        S.party.push(id);
+        S.present = S.present.filter(o=>o.id!==id);
+        c.trust=clamp(c.trust+1);
+      }else{
+        pushLog(`${c.name}「了解」`, "muted");
+        c.trust=clamp(c.trust+1);
+      }
+    }else{
+      pushLog(`${c.name}は頷かない。`, "danger");
+      c.trust=clamp(c.trust-3);
+      if(S.suspect && chance(25)) S.alert=clamp(S.alert+6);
+    }
+  }
+};
+
+const CmdHide = {
+  handle(kind){
+    pushLog("身を潜める。", "muted");
+    const seen = isSomeoneNoticed();
+    if(seen && chance(40)) setSuspect("隠れ方が不自然");
+
+    const p = clamp(55 - Math.floor(S.alert/3) + (kind==="hide:still"?10:0), 10, 75);
+    if(seen && chance(p)){
+      pushLog("視線が逸れた。気配が薄まる。", "ok");
+      S.present.forEach(o=>o.noticed=false);
+      S.alert = clamp(S.alert-10);
+    }else{
+      S.alert = clamp(S.alert-6);
+      pushLog("息を止める。だが心臓の音がうるさい。", "muted");
+    }
+  }
+};
+
+const CmdRun = {
+  handle(){
+    pushLog("距離を取る。背中に視線が刺さる。", "muted");
+    setSuspect("露骨な離脱行動");
+    S.alert = clamp(S.alert + 6);
+  }
+};
+
+const CmdFight = {
+  handle(){
     setSuspect("交戦");
     pushLog("短い衝突。勝っても、音は残る。", "danger");
     if(chance(55)){
@@ -993,309 +1189,12 @@ if(cmdId==="talk" && targetId.startsWith("ch:")){
       pushLog("押される。腕を取られそうになる。", "danger");
       if(chance(35)) S.flags.add("captured");
     }
-    afterStep();
-    return;
   }
+};
 
-  if(cmdId==="drop" && targetId.startsWith("drop:")){
-    const it=targetId.slice(5);
-    removeItem(it);
-    pushLog(`（破棄：${ITEMS[it]?.name ?? it}）`, "muted");
-    afterStep();
-    return;
-  }
-
-  pushLog("うまくいかない。", "muted");
-  afterStep();
-}
-
-/* =========================
-   Events
-========================= */
-function examineEvent(targetId){
-  if(targetId.startsWith("ch:")){
-    const id=targetId.slice(3);
-    const c=S.chars[id];
-    c.met=true;
-    pushLog(`${c.name}の様子を窺う。`, "muted");
-    const obj = S.present.find(o=>o.id===id);
-    if(obj && !obj.noticed){
-      pushLog(`${c.name}はまだこちらに気づいていない。`, "muted");
-      return;
-    }
-    // 疑いがあると詰問されやすい（ただし「捕縛」はまだ）
-    if(S.suspect && chance(40)){
-      pushLog(`${c.name}「提督…行動が多いです」`, "danger");
-      S.alert = clamp(S.alert+6);
-    }else{
-      pushLog(`${c.name}は短く頷くだけだ。`, "muted");
-    }
-    return;
-  }
-
-  if(targetId.startsWith("obj:")){
-    const obj=targetId.slice(4);
-    examined(obj);
-    pushLog(`調べる：<span class="muted">${obj}</span>`);
-
-    // 資材庫：戸棚→鍵
-    if(S.location==="storage" && obj==="戸棚"){
-      if(!S.flags.has("has_gate_key")){
-        pushLog("鍵束の刻印。封鎖ゲートのものだ。", "ok");
-        reveal("item:gate_key");
-      }else pushLog("空だ。鍵は確保済み。", "muted");
-      return;
-    }
-
-    // 資材庫：木箱→燃料缶（1回）
-    if(S.location==="storage" && obj==="木箱"){
-      if(!LS().depleted.has("fuel_box")){
-        pushLog("木箱の底に、油の匂い。", "muted");
-        reveal("item:fuel_can");
-        depleted("fuel_box");
-      }else pushLog("空箱ばかりだ。", "muted");
-      return;
-    }
-
-    // 無線室：暗号表
-    if(S.location==="radio" && obj==="暗号表の引き出し"){
-      if(!hasItem("codebook") && !LS().depleted.has("codebook")){
-        pushLog("紙束。暗号表だ。", "ok");
-        reveal("item:codebook");
-        depleted("codebook");
-      }else pushLog("もう見当たらない。", "muted");
-      return;
-    }
-
-    // 浴場：脱衣棚→布片、鍵チャンス
-    if(S.location==="bath" && obj==="脱衣棚"){
-      if(!LS().depleted.has("locker")){
-        pushLog("タグ付きの布片。匂いを散らせる。", "ok");
-        reveal("item:cloth_tag");
-        if(!S.flags.has("has_gate_key") && chance(35)){
-          pushLog("奥に小さな鍵束…封鎖の刻印。", "ok");
-          reveal("item:gate_key");
-        }else{
-          pushLog("鍵の痕跡はあるが、確証は薄い。", "muted");
-        }
-        depleted("locker");
-      }else pushLog("棚はもう荒らされている。", "muted");
-      return;
-    }
-
-    // 工廠：部品片
-    if(S.location==="workshop" && obj==="予備部材棚"){
-      if(!LS().depleted.has("scrap")){
-        pushLog("使えそうな部材。整備に回せる。", "ok");
-        reveal("item:scrap");
-        depleted("scrap");
-      }else pushLog("役立つ部材はもうない。", "muted");
-      return;
-    }
-
-    pushLog("手掛かりは少ない。", "muted");
-    return;
-  }
-
-  if(targetId.startsWith("sub:")){
-    const sub=targetId.slice(4);
-    examined(sub);
-    pushLog(`さらに調べる：<span class="muted">${sub}</span>`);
-    pushLog("細部まで見ても、得るものは少ない。", "muted");
-  }
-}
-
-function touchEvent(targetId){
-  if(targetId.startsWith("ch:")){
-    const id=targetId.slice(3);
-    const c=S.chars[id];
-    c.met=true;
-    const obj=S.present.find(o=>o.id===id);
-    if(obj && !obj.noticed){
-      pushLog(`${c.name}に近づいた。相手はまだ気づいていない。`, "muted");
-      // ここで触るのは“怪しさ”として疑いが立つ可能性
-      if(chance(40)){ obj.noticed=true; pushLog(`${c.name}がこちらを向いた。`, "danger"); S.alert=clamp(S.alert+6); }
-      return;
-    }
-    pushLog(`${c.name}に近づく。`, "muted");
-    if(S.suspect && chance(35)){
-      pushLog(`${c.name}「提督。距離が近い」`, "danger");
-      S.alert=clamp(S.alert+6);
-    }else{
-      pushLog(`${c.name}は一瞬だけ迷う顔をした。`, "muted");
-      c.trust=clamp(c.trust+1);
-      c.intimacy=clamp(c.intimacy+2);
-    }
-    return;
-  }
-
-  if(targetId.startsWith("obj:")){
-    const obj=targetId.slice(4);
-    touched(obj);
-    pushLog(`触る：<span class="muted">${obj}</span>`);
-
-    // 無線機：照合の前提
-    if(S.location==="radio" && obj==="受信機"){
-      if(!S.flags.has("contact_possible")){
-        pushLog("ノイズの底に符丁。繋がる“窓”がある。", "ok");
-        S.flags.add("contact_possible");
-      }else{
-        pushLog("受信状態を整える。照合へ進めそうだ。", "muted");
-      }
-      return;
-    }
-
-    // 埠頭：輸送船は最終
-    if(S.location==="dock" && obj==="輸送船"){
-      pushLog("輸送船に手を掛ける。ここから先は“出港”だ。", "muted");
-      // 出港を触るだけで疑い確定はしないが、気づかれてると危険
-      if(isSomeoneNoticed() && chance(35)){
-        setSuspect("埠頭での不審行動");
-        S.alert=clamp(S.alert+8);
-      }
-      return;
-    }
-
-    // 封鎖ゲートに触れるのは怪しさ
-    if(S.location==="dock" && obj==="封鎖ゲート"){
-      pushLog("封鎖は堅い。鍵が要る。", "muted");
-      if(isSomeoneNoticed() && chance(35)) setSuspect("封鎖ゲートに干渉");
-      return;
-    }
-
-    // 触るは見られてると疑われやすい
-    if(isSomeoneNoticed() && chance(25)){
-      setSuspect("装置に干渉する姿を見られた");
-      S.alert=clamp(S.alert+6);
-    }
-    return;
-  }
-
-  if(targetId.startsWith("sub:")){
-    pushLog("触れるが、意味は薄い。", "muted");
-  }
-}
-
-function pickupEvent(it){
-  const LSx = LS();
-  if(!LSx.revealed.has("item:"+it)){
-    pushLog("まだ見つけていない。", "muted");
-    return;
-  }
-  LSx.revealed.delete("item:"+it);
-
-  if(it==="fuel_can"){
-    pushLog("燃料缶を確保した。<span class='ok'>燃料+8</span>", "ok");
-    S.fuel = Math.max(0, S.fuel + 8);
-    // 燃料は“怪しい”にはしない（所持は普通）…ただし埠頭で見られると
-    return;
-  }
-
-  if(it==="gate_key"){
-    pushLog("ゲート鍵を確保した。", "ok");
-    S.flags.add("has_gate_key");
-    addItem("gate_key");
-    // 鍵を取るのは疑いの代表
-    if(isSomeoneNoticed()) setSuspect("鍵の確保を見られた");
-    else if(chance(15)) setSuspect("鍵の所在が動いた");
-    return;
-  }
-
-  if(it==="codebook"){
-    pushLog("暗号表を確保した。", "ok");
-    addItem("codebook");
-    // 暗号表は単体では疑いにしない（司令の仕事にも見える）
-    return;
-  }
-
-  if(it==="scrap"){
-    pushLog("部品片を確保した。", "ok");
-    addItem("scrap");
-    // 工廠は自然、疑いにはしない
-    return;
-  }
-
-  if(it==="cloth_tag"){
-    pushLog("タグ付き布片を確保した。", "ok");
-    addItem("cloth_tag");
-    return;
-  }
-
-  addItem(it);
-}
-
-function useEvent(targetId){
-  if(targetId.startsWith("it:")){
-    const it=targetId.slice(3);
-
-    if(it==="scrap"){
-      if(S.location==="workshop"){
-        removeItem("scrap");
-        S.flags.add("ship_repaired");
-        pushLog("部品が噛み合う。機関の息が戻る。<span class='ok'>整備完了</span>", "ok");
-      }else pushLog("工廠で使うべきだ。", "muted");
-      return;
-    }
-
-    if(it==="codebook"){
-      if(S.location==="radio" && S.flags.has("contact_possible")){
-        S.flags.add("route_confirmed");
-        pushLog("暗号表で照合。航路が確定する。<span class='ok'>航路確定</span>", "ok");
-        // 無線照合は「脱走準備」扱い。気づかれてたら疑い
-        if(isSomeoneNoticed()) setSuspect("無線照合を見られた");
-        else if(chance(20)) setSuspect("無線の使用履歴");
-      }else pushLog("無線室で照合すべきだ。", "muted");
-      return;
-    }
-
-    if(it==="gate_key"){
-      if(S.location==="dock"){ openGate(); }
-      else pushLog("埠頭の封鎖ゲートで使うべきだ。", "muted");
-      return;
-    }
-
-    if(it==="cloth_tag"){
-      pushLog("布片の匂いを散らす。気配が薄まる。", "muted");
-      S.alert = clamp(S.alert-6);
-      return;
-    }
-
-    pushLog("使い道がない。", "muted");
-    return;
-  }
-
-  if(targetId==="use:radio"){
-    if(S.location!=="radio"){ pushLog("ここでは無線照合ができない。", "muted"); return; }
-    if(!S.flags.has("contact_possible")){ pushLog("まず受信機を確かめる必要がある。", "muted"); return; }
-    if(hasItem("codebook")){
-      S.flags.add("route_confirmed");
-      pushLog("照合が通る。<span class='ok'>航路確定</span>", "ok");
-    }else{
-      if(chance(30)){ S.flags.add("route_confirmed"); pushLog("不安定だが照合に成功。<span class='ok'>航路確定</span>", "ok"); }
-      else pushLog("照合が足りない。暗号表が欲しい。", "muted");
-    }
-    if(isSomeoneNoticed()) setSuspect("無線照合を見られた");
-    else if(chance(20)) setSuspect("無線の使用履歴");
-    return;
-  }
-
-  if(targetId==="use:repair"){
-    if(S.location!=="workshop"){ pushLog("ここでは整備ができない。", "muted"); return; }
-    if(S.flags.has("ship_repaired")){ pushLog("整備は完了している。", "muted"); return; }
-    if(hasItem("scrap")){
-      removeItem("scrap");
-      S.flags.add("ship_repaired");
-      pushLog("整備が通る。<span class='ok'>整備完了</span>", "ok");
-    }else pushLog("部品が足りない。部品片が必要だ。", "muted");
-    return;
-  }
-
-  if(targetId==="use:gate"){ if(S.location!=="dock"){ pushLog("ここでは封鎖ゲートがない。", "muted"); return; } openGate(); return; }
-  if(targetId==="use:ship"){ if(S.location!=="dock"){ pushLog("ここでは出港できない。", "muted"); return; } tryEscape(); return; }
-
-  pushLog("使えない。", "muted");
-}
-
+/* =========================================================
+   12) 脱出フロー（ゲート解除/出港）
+========================================================= */
 function openGate(){
   if(S.flags.has("gate_opened")){ pushLog("封鎖は既に解除されている。", "muted"); return; }
   if(S.flags.has("has_gate_key") || hasItem("gate_key")){
@@ -1325,87 +1224,31 @@ function tryEscape(){
   pushLog("出港する。波を割り、島影が遠ざかる。", "ok");
 }
 
-function orderEvent(id){
-  const c=S.chars[id];
-  c.met=true;
-
-  pushLog(`${c.name}に命令する。`, "muted");
-
-  // 命令は信頼依存
-  const p = clamp(10 + (c.trust-40), 5, 80);
-  if(chance(p)){
-    // 同行命令：明示的に同行
-    if(!S.party.includes(id)){
-      pushLog(`${c.name}「了解。…ただし、提督」`, "muted");
-      pushLog(`${c.name}「変なことをするなら止めます」`, S.suspect?"danger":"muted");
-      S.party.push(id);
-      S.present = S.present.filter(o=>o.id!==id);
-      c.trust=clamp(c.trust+1);
-      return;
-    }else{
-      pushLog(`${c.name}「了解」`, "muted");
-      c.trust=clamp(c.trust+1);
-      return;
-    }
-  }else{
-    pushLog(`${c.name}は頷かない。`, "danger");
-    c.trust=clamp(c.trust-3);
-    // 反発が目立つと疑いが濃くなることも
-    if(S.suspect && chance(25)) S.alert=clamp(S.alert+6);
-  }
-}
-
-function hideEvent(kind){
-  pushLog("身を潜める。", "muted");
-  // 隠れる自体が“怪しい”になり得る：気づかれてる時だけ疑い
-  const seen = isSomeoneNoticed();
-  if(seen && chance(40)) setSuspect("隠れ方が不自然");
-
-  // 効果：気づかれてるなら“気づき”解除のチャンス
-  const p = clamp(55 - Math.floor(S.alert/3) + (kind==="hide:still"?10:0), 10, 75);
-  if(seen && chance(p)){
-    pushLog("視線が逸れた。気配が薄まる。", "ok");
-    S.present.forEach(o=>o.noticed=false);
-    S.alert = clamp(S.alert-10);
-  }else{
-    S.alert = clamp(S.alert-6);
-    pushLog("息を止める。だが心臓の音がうるさい。", "muted");
-  }
-}
-
-/* =========================
-   Suspect-phase: capture attempts
-   ※疑いが「あり」の時だけ発生
-========================= */
+/* =========================================================
+   13) 疑い時の“制止→捕縛”チェック（理不尽にならない条件）
+   - suspect なしなら絶対に捕縛しない
+========================================================= */
 function captureCheck(){
-  if(!S.suspect) return; // ←ここが肝。疑いなしで捕縛は起きない。
+  if(!S.suspect) return;
 
-  // 同じ場所に“気づいてる艦娘”がいると止めに来る
   const noticed = S.present.filter(o=>o.noticed);
   if(!noticed.length) return;
 
-  // 発生率：警戒が高いほど
   const p = clamp(8 + Math.floor(S.alert/8), 6, 30);
   if(!chance(p)) return;
 
   const o = noticed[rint(noticed.length)];
   const name = CHAR[o.id].name;
 
-  // いきなり捕縛じゃなく「制止→捕縛」へ段階化
   pushLog(`${name}が前に出る。<span class="danger">「提督、止まって」</span>`, "danger");
-
-  // 回避チャンス：隠れる/謝るを次手でやれ、って圧を作る
-  // ここでは即ゲームオーバーにしない（理不尽回避）
   S.alert = clamp(S.alert + 8);
 
-  // ただし警戒MAXだと捕縛
   if(S.alert>=100){
     S.flags.add("captured");
   }
 }
 
 function pressureCheck(){
-  // だらだらすると警戒は少しずつ上がる
   if(S.turn > 70 && chance(12)){
     pushLog("巡回が濃くなる。", "muted");
     S.alert = clamp(S.alert+4);
@@ -1415,9 +1258,9 @@ function pressureCheck(){
   }
 }
 
-/* =========================
-   Ending
-========================= */
+/* =========================================================
+   14) エンディング判定
+========================================================= */
 function resolveEnding(){
   const escaped = S.flags.has("escaped_mainland");
   const captured = S.flags.has("captured");
@@ -1441,8 +1284,11 @@ function endGame(id){
   pushLog(`<span class="muted small">MENU → 最初から / ロード で再開できます。</span>`, "muted");
 }
 
+/* =========================================================
+   15) ターン後処理（出現更新 / 捕縛チェック / エンド）
+========================================================= */
 function afterStep(){
-  // 出現入れ替え：頻度は低めに（臨場感のため）
+  // 出現入れ替え（頻度は低め）
   if(chance(18)) refreshPresent(true);
 
   captureCheck();
@@ -1454,20 +1300,19 @@ function afterStep(){
   renderTop();
 }
 
-/* =========================
-   Save/Load
-========================= */
+/* =========================================================
+   16) セーブ/ロード（localStorage）
+========================================================= */
 function resetLogFromState(){
-  logEl.innerHTML="";
+  el.log.innerHTML="";
   S.log.forEach(e=>{
     const div=document.createElement("div");
     if(e.cls) div.className=e.cls;
     div.innerHTML=e.line;
-    logEl.appendChild(div);
+    el.log.appendChild(div);
   });
-  logEl.scrollTop = logEl.scrollHeight + 9999;
+  el.log.scrollTop = el.log.scrollHeight + 9999;
 }
-
 function serialize(){
   return {
     seed:S.seed, turn:S.turn, alert:S.alert, fuel:S.fuel, suspect:S.suspect,
@@ -1523,7 +1368,20 @@ function hydrate(obj){
   resetLogFromState();
   renderTop();
 }
+function saveLocal(){
+  localStorage.setItem("island_escape_save", JSON.stringify(serialize()));
+  toast("セーブしました");
+}
+function loadLocal(){
+  const raw = localStorage.getItem("island_escape_save");
+  if(!raw){ toast("セーブがありません"); return; }
+  hydrate(JSON.parse(raw));
+  toast("ロードしました");
+}
 
+/* =========================================================
+   17) MENU / 起動
+========================================================= */
 function newGame(keepSeed=false){
   if(!keepSeed){
     seed = (Date.now()>>>0) ^ 0xC0FFEE;
@@ -1538,48 +1396,208 @@ function newGame(keepSeed=false){
   renderTop();
 }
 
-function saveLocal(){
-  localStorage.setItem("island_escape_save", JSON.stringify(serialize()));
-  toast("セーブしました");
-}
-function loadLocal(){
-  const raw = localStorage.getItem("island_escape_save");
-  if(!raw){ toast("セーブがありません"); return; }
-  hydrate(JSON.parse(raw));
-  toast("ロードしました");
+function buildCmdButtons(){
+  el.cmdGrid.innerHTML = CMD.map(c=>`<button data-c="${c.id}">${c.label}</button>`).join("");
+  el.cmdGrid.querySelectorAll("button").forEach(b=>{
+    b.onclick=()=>targetUI.open(b.dataset.c);
+  });
 }
 
-/* =========================
-   Menu wiring
-========================= */
-document.getElementById("btnMenu").onclick=()=>document.getElementById("menuWrap").classList.add("show");
-document.getElementById("menuClose").onclick=()=>document.getElementById("menuWrap").classList.remove("show");
-document.getElementById("btnSave").onclick=saveLocal;
-document.getElementById("btnLoad").onclick=loadLocal;
-document.getElementById("btnRestart").onclick=()=>{
-  document.getElementById("menuWrap").classList.remove("show");
+/* =========================================================
+   18) 会話セクション（ここだけ集中して作り込める）
+   - npcLine(): 相手の第一声
+   - options(): 返答選択肢
+   - applyChoice(): 選択肢の効果
+========================================================= */
+const Dialogue = (() => {
+
+  function npcLine(id, context){
+    const suspect = S.suspect;
+    const noticed = context.noticed;
+
+    const base = {
+      shigure: suspect ? "時雨「……提督。行き先を、聞いていい？」" : (noticed?"時雨「提督。夜更かし？」":"時雨「……誰かいるの？」"),
+      asashio: suspect ? "朝潮「提督。行動理由を確認します」" : (noticed?"朝潮「提督。こんな時間に？」":"朝潮「……気配が…」"),
+      kasumi: suspect ? "霞「はぁ？また逃げる気？」" : (noticed?"霞「今夜は落ち着きないわね」":"霞「……誰かいるの？」"),
+      takao: suspect ? "高雄「提督。動きが不自然です。説明を」" : (noticed?"高雄「提督。お疲れですか」":"高雄「……そこですか？」"),
+      kongo: suspect ? "金剛「提督！Stop！どこ行くのネ！」" : (noticed?"金剛「Hey提督！眠れない？」":"金剛「誰かいるヨ！」"),
+      hatsuzuki: suspect ? "初月「提督。目的を言え」" : (noticed?"初月「提督。行動が多い」":"初月「……誰だ」"),
+      urakaze: suspect ? "浦風「提督…無茶したらいけんよ」" : (noticed?"浦風「提督、寒うない？」":"浦風「…提督？」"),
+      ikazuchi: suspect ? "雷「提督！待って！どこ行くの！？」" : (noticed?"雷「提督、どうしたの？」":"雷「えっ、誰？」"),
+      hibiki: suspect ? "響「……止まれ」" : (noticed?"響「……夜だ」":"響「……気配」"),
+    }[id];
+
+    return base;
+  }
+
+  function options(id, context){
+    const c=S.chars[id];
+    const opts = [];
+
+    // 謝るに寄せたい時（apologize コマンドなど）
+    if(context.force==="apologize"){
+      opts.push({key:"apologize", label:"「疑わせたならすまない」", tag:"謝る"});
+      opts.push({key:"back", label:"「戻る」", tag:"退く"});
+      return opts;
+    }
+
+    // 基本の会話
+    opts.push({key:"neutral", label:"「ちょっと見回りだ」", tag:"無難"});
+    opts.push({key:"lie", label:"「眠れなくて散歩してた」", tag:"誤魔化す"});
+    opts.push({key:"back", label:"「悪い、戻る」", tag:"退く"});
+
+    if(c.trust>=70 && !S.party.includes(id)){
+      opts.push({key:"join", label:"「一緒に来てくれ」", tag:"同行"});
+    }
+
+    if(S.suspect){
+      opts.push({key:"explain", label:"「誤解だ。理由がある」", tag:"説明"});
+      opts.push({key:"apologize", label:"「疑わせたならすまない」", tag:"謝る"});
+    }
+
+    if(c.intimacy>=30){
+      opts.push({key:"soft", label:"「心配してくれて助かる」", tag:"距離を詰める"});
+    }
+
+    return opts;
+  }
+
+  function applyChoice(id, context, key){
+    const c=S.chars[id];
+    c.met=true;
+
+    // プレイヤー台詞ログ
+    const say = (txt)=>pushLog(`<span class="muted">提督</span>：「${txt}」`);
+
+    if(key==="neutral"){
+      say("ちょっと見回りだ。");
+      if(S.suspect){
+        if(chance(35)){ pushLog(`${c.name}は納得していない。`, "danger"); S.alert=clamp(S.alert+6); }
+        else { pushLog(`${c.name}「……分かった」`, "muted"); c.trust=clamp(c.trust+1); }
+      }else{
+        pushLog(`${c.name}「そう。気をつけて」`, "muted");
+        c.trust=clamp(c.trust+2);
+        c.intimacy=clamp(c.intimacy+2);
+      }
+      return;
+    }
+
+    if(key==="lie"){
+      say("眠れなくて散歩してた。");
+      const lieP = S.suspect ? 55 : 25;
+      if(chance(lieP)){
+        pushLog(`${c.name}「……嘘の匂いがする」`, "danger");
+        S.alert=clamp(S.alert+8);
+        setSuspect("言い訳が不自然");
+        c.trust=clamp(c.trust-3);
+      }else{
+        pushLog(`${c.name}「そう…なら、少し落ち着いて」`, "muted");
+        c.trust=clamp(c.trust+1);
+        c.intimacy=clamp(c.intimacy+3);
+      }
+      return;
+    }
+
+    if(key==="back"){
+      say("悪い、戻る。");
+      pushLog(`${c.name}は短く頷いた。`, "muted");
+      S.alert = clamp(S.alert-3);
+      c.trust = clamp(c.trust+1);
+      return;
+    }
+
+    if(key==="explain"){
+      say("誤解だ。理由がある。");
+      const p = clamp(20 + (c.trust-40), 10, 75);
+      if(chance(p)){
+        pushLog(`${c.name}「……話は聞く」`, "ok");
+        S.alert=clamp(S.alert-6);
+        c.trust=clamp(c.trust+3);
+      }else{
+        pushLog(`${c.name}「理由になってない」`, "danger");
+        S.alert=clamp(S.alert+6);
+        c.trust=clamp(c.trust-2);
+      }
+      return;
+    }
+
+    if(key==="apologize"){
+      say("疑わせたならすまない。");
+      pushLog(`${c.name}「……次は気をつけて」`, "muted");
+      S.alert=clamp(S.alert-6);
+      c.trust=clamp(c.trust+4);
+      c.intimacy=clamp(c.intimacy+1);
+      return;
+    }
+
+    if(key==="soft"){
+      say("心配してくれて助かる。");
+      pushLog(`${c.name}は視線を少しだけ和らげた。`, "ok");
+      c.trust=clamp(c.trust+2);
+      c.intimacy=clamp(c.intimacy+6);
+      if(c.intimacy>=100 && !c.bonded){ c.bonded=true; pushLog(`（${c.name}との関係が深くなった）`, "ok"); }
+      return;
+    }
+
+    if(key==="join"){
+      say("一緒に来てくれ。");
+      const p = clamp(30 + (c.trust-60) + Math.floor(c.intimacy/10), 10, 85);
+      if(chance(p)){
+        pushLog(`${c.name}「……分かった。距離は保つ」`, "ok");
+        if(!S.party.includes(id)) S.party.push(id);
+        S.present = S.present.filter(o=>o.id!==id);
+      }else{
+        pushLog(`${c.name}「今は無理」`, "muted");
+        c.trust=clamp(c.trust-1);
+      }
+      return;
+    }
+  }
+
+  return { npcLine, options, applyChoice };
+})();
+
+/* =========================================================
+   19) 起動処理とイベント配線
+========================================================= */
+function wireMenu(){
+  const menuWrap=document.getElementById("menuWrap");
+  document.getElementById("btnMenu").onclick=()=>menuWrap.classList.add("show");
+  document.getElementById("menuClose").onclick=()=>menuWrap.classList.remove("show");
+  document.getElementById("btnSave").onclick=saveLocal;
+  document.getElementById("btnLoad").onclick=loadLocal;
+
+  document.getElementById("btnRestart").onclick=()=>{
+    menuWrap.classList.remove("show");
+    newGame(false);
+  };
+  document.getElementById("btnReplay").onclick=()=>{
+    menuWrap.classList.remove("show");
+    const keep = S.seed;
+    seed = keep;
+    rnd = mulberry32(seed);
+    S = defaultState();
+    S.seed = seed;
+    pushLog("—— <b>離島鎮守府</b> ——");
+    pushLog("同じ潮、同じ夜。違う一手で抜けろ。<br><span class='muted'>（同条件リプレイ）</span>");
+    enterLocation("hq");
+    renderTop();
+  };
+  menuWrap.addEventListener("click",(e)=>{ if(e.target.id==="menuWrap") menuWrap.classList.remove("show"); });
+}
+
+function boot(){
+  buildCmdButtons();
+  wireMenu();
   newGame(false);
-};
-document.getElementById("btnReplay").onclick=()=>{
-  document.getElementById("menuWrap").classList.remove("show");
-  const keep = S.seed;
-  seed = keep;
-  rnd = mulberry32(seed);
-  S = defaultState();
-  S.seed = seed;
-  pushLog("—— <b>離島鎮守府</b> ——");
-  pushLog("同じ潮、同じ夜。違う一手で抜けろ。<br><span class='muted'>（同条件リプレイ）</span>");
-  enterLocation("hq");
-  renderTop();
-};
-document.getElementById("menuWrap").addEventListener("click",(e)=>{
-  if(e.target.id==="menuWrap") document.getElementById("menuWrap").classList.remove("show");
-});
+}
 
-/* =========================
-   Boot
-========================= */
-newGame(false);
+return { boot };
+
+})(); // App end
+
+// 起動
+App.boot();
 </script>
 </body>
 </html>
