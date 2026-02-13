@@ -453,20 +453,40 @@ function calcNoticedChance(){
 
 function refreshPresent(force=false){
   const pool = locationPool(S.location);
+
+  // 既存の出現（同行は除外）を保持
+  const existing = new Map();
+  S.present.forEach(o=>{
+    if(!S.party.includes(o.id)) existing.set(o.id, {id:o.id, noticed:!!o.noticed});
+  });
+
+  // 目標人数
   let count = chance(55)?2:1;
   if(force) count = Math.max(1, count);
 
-  const pick=[];
-  for(let k=0;k<50 && pick.length<count;k++){
-    const id=pool[rint(pool.length)];
-    if(!pick.some(x=>x.id===id) && !S.party.includes(id)) pick.push({id, noticed:false});
+  // まず既存を優先採用（最大countまで）
+  const next = [];
+  for(const o of existing.values()){
+    if(next.length>=count) break;
+    next.push({id:o.id, noticed:o.noticed});
   }
 
-  // 気づき判定
-  const p = calcNoticedChance();
-  pick.forEach(o=>o.noticed = chance(p));
+  // 足りない分だけ新規追加
+  for(let k=0;k<80 && next.length<count;k++){
+    const id = pool[rint(pool.length)];
+    if(S.party.includes(id)) continue;
+    if(next.some(x=>x.id===id)) continue;
+    next.push({id, noticed:false});
+  }
 
-  S.present = pick;
+  // 新規だけ気づき抽選。既存のnoticedは維持（話したら戻らない）
+  const p = calcNoticedChance();
+  next.forEach(o=>{
+    if(existing.has(o.id)) return;        // 既存は保持
+    o.noticed = chance(p);                // 新規のみ抽選
+  });
+
+  S.present = next;
 }
 
 function enterLocation(loc){
@@ -672,10 +692,9 @@ dlgWrap.addEventListener("click",(e)=>{ if(e.target.id==="dlgWrap") dlgWrap.clas
 
 let pendingAfterDialogue = null;
 
-function openDialogue(npcId, context){
+function openDialogue(npcId, context, npcLineText){
   const c = S.chars[npcId];
-  dlgTitle.textContent = `会話：${c.name}`;
-  dlgNpcLine.innerHTML = npcLine(npcId, context);
+  dlgTitle.textContent = `返答を選択：${c.name}`;
   dlgHint.textContent = "提督の返答を選ぶ（選択で信頼/親密/疑いが動く）";
 
   const opts = dialogueOptions(npcId, context);
@@ -918,14 +937,21 @@ function runCommand(cmdId, targetId){
   if(cmdId==="use"){ useEvent(targetId); afterStep(); return; }
 
   // 会話：必ず「会話モーダル→提督選択」にする
-  if(cmdId==="talk" && targetId.startsWith("ch:")){
-    const id=targetId.slice(3);
-    const obj = S.present.find(o=>o.id===id);
-    const noticed = obj ? obj.noticed : true;
-    pendingAfterDialogue = ()=>afterStep();
-    openDialogue(id, {noticed});
-    return;
-  }
+if(cmdId==="talk" && targetId.startsWith("ch:")){
+  const id=targetId.slice(3);
+  const obj = S.present.find(o=>o.id===id);
+
+  // 話しかけた時点で「気づき」は確定
+  if(obj) obj.noticed = true;
+
+  // NPC台詞をログに確定出力
+  const npc = npcLine(id, {noticed:true});
+  pushLog(`<b>${S.chars[id].name}</b>：${stripHtml(npc)}`);
+
+  pendingAfterDialogue = ()=>afterStep();
+  openDialogue(id, {noticed:true}, npc);
+  return;
+}
 
   // 謝る（単独コマンド）は簡易に「会話」へ寄せる
   if(cmdId==="apologize" && targetId.startsWith("ch:")){
