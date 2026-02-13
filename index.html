@@ -739,4 +739,757 @@ function runCommand(cmdId, targetId){
   if(cmdId==="run"){
     pushLog("距離を取る。背中に視線が刺さる。", "muted");
     markDetected("逃げ腰を見せた");
-    S.ale
+    S.alert = clamp(S.alert + (targetId==="run:cut"?10:7));
+    afterStep();
+    return;
+  }
+
+  // 闘う
+  if(cmdId==="fight"){
+    markDetected("衝突した");
+    S.alert = clamp(S.alert + (targetId==="fight:break"?18:12));
+    pushLog("短い衝突。勝っても、音は残る。", "danger");
+    if(chance(60)){
+      pushLog("押し返した。だが包囲は締まる。", "muted");
+    }else{
+      pushLog("押される。次の一手が重くなる。", "danger");
+      if(chance(20)) S.flags.add("captured");
+    }
+    afterStep();
+    return;
+  }
+
+  // 捨てる
+  if(cmdId==="drop" && targetId.startsWith("drop:")){
+    const it=targetId.slice(5);
+    removeItem(it);
+    pushLog(`（破棄：${ITEMS[it]?.name ?? it}）`, "muted");
+    afterStep();
+    return;
+  }
+
+  pushLog("うまくいかない。", "muted");
+  afterStep();
+}
+
+/* =========================
+   Deepened events
+========================= */
+function LS(){ return S.locState[S.location]; }
+
+function reveal(x){ LS().revealed.add(x); }
+function examined(x){ LS().examined.add(x); }
+function touched(x){ LS().touched.add(x); }
+function depleted(x){ LS().depleted.add(x); }
+
+function examineEvent(targetId){
+  // 人物を調べる：詰問/様子見
+  if(targetId.startsWith("ch:")){
+    const id=targetId.slice(3);
+    const c=S.chars[id];
+    c.met=true;
+    pushLog(`${c.name}の様子を窺う。`, "muted");
+    if(S.flags.has("detected_once") && stanceOf(id)!=="味方寄り" && chance(55)){
+      pushLog(`${c.name}「……提督。いま、どこへ？」`, "danger");
+      S.alert = clamp(S.alert+6);
+    }else{
+      pushLog(`${c.name}は視線を逸らすか、短く頷く。`, "muted");
+      if(chance(35)) c.trust = clamp(c.trust+1);
+    }
+    return;
+  }
+
+  // 物/派生対象
+  if(targetId.startsWith("obj:")){
+    const obj=targetId.slice(4);
+    examined(obj);
+    pushLog(`調べる：<span class="muted">${obj}</span>`);
+
+    // 場所別の“増える対象”
+    // 資材庫：戸棚→鍵 / 燃料缶（有限）
+    if(S.location==="storage" && obj==="戸棚"){
+      if(!S.flags.has("has_gate_key")){
+        pushLog("鍵束の刻印。封鎖ゲートのものだ。", "ok");
+        reveal("item:gate_key");
+      }else{
+        pushLog("もう空だ。鍵は確保済み。", "muted");
+      }
+      return;
+    }
+    if(S.location==="storage" && obj==="木箱"){
+      if(!LS().depleted.has("fuel_box")){
+        pushLog("木箱の底に、油の匂い。", "muted");
+        reveal("item:fuel_can");
+        depleted("fuel_box"); // 1回きり
+      }else{
+        pushLog("空箱ばかりだ。", "muted");
+      }
+      return;
+    }
+
+    // 無線室：暗号表の引き出し→暗号表（有限）
+    if(S.location==="radio" && obj==="暗号表の引き出し"){
+      if(!hasItem("codebook") && !LS().depleted.has("codebook")){
+        pushLog("紙束。暗号表だ。", "ok");
+        reveal("item:codebook");
+        depleted("codebook");
+      }else{
+        pushLog("もう見当たらない。", "muted");
+      }
+      return;
+    }
+
+    // 浴場：脱衣棚→布片（追跡鈍化）/鍵の痕跡（代替ルート）
+    if(S.location==="bath" && obj==="脱衣棚"){
+      if(!LS().depleted.has("locker")){
+        pushLog("タグ付きの布片。匂いが薄く、追跡を鈍らせるかもしれない。", "ok");
+        reveal("item:cloth_tag");
+        // 鍵を資材庫以外でも見つけ得る（ただし確率）
+        if(!S.flags.has("has_gate_key") && chance(35)){
+          pushLog("奥に小さな鍵束…封鎖の刻印。", "ok");
+          reveal("item:gate_key");
+        }else{
+          pushLog("鍵らしき痕跡はあるが、確証は薄い。", "muted");
+        }
+        depleted("locker");
+      }else{
+        pushLog("棚はもう荒らされている。", "muted");
+      }
+      return;
+    }
+
+    // 工廠：予備部材棚→部品片（有限）
+    if(S.location==="workshop" && obj==="予備部材棚"){
+      if(!LS().depleted.has("scrap")){
+        pushLog("使えそうな部材。整備に回せる。", "ok");
+        reveal("item:scrap");
+        depleted("scrap");
+      }else{
+        pushLog("役立つ部材はもうない。", "muted");
+      }
+      return;
+    }
+
+    // 埠頭：封鎖ゲート→条件説明、輸送船→最終
+    if(S.location==="dock" && obj==="封鎖ゲート"){
+      pushLog("封鎖は堅い。鍵と手順が要る。", "muted");
+      return;
+    }
+    if(S.location==="dock" && obj==="輸送船"){
+      pushLog("出港できるか確認する。", "muted");
+      return;
+    }
+
+    // 一般
+    pushLog("手掛かりは少ない。", "muted");
+    return;
+  }
+
+  if(targetId.startsWith("sub:")){
+    const sub=targetId.slice(4);
+    examined(sub);
+    pushLog(`さらに調べる：<span class="muted">${sub}</span>`);
+    pushLog("細部まで見ても、得るものは少ない。", "muted");
+    return;
+  }
+}
+
+function touchEvent(targetId){
+  if(targetId.startsWith("ch:")){
+    const id=targetId.slice(3);
+    const c=S.chars[id];
+    c.met=true;
+    pushLog(`${c.name}に近づく。`, "muted");
+
+    if(S.flags.has("detected_once") && stanceOf(id)!=="味方寄り" && chance(60)){
+      pushLog(`${c.name}「……抵抗は、しないで」`, "danger");
+      S.alert = clamp(S.alert+10);
+      if(chance(40)){
+        S.flags.add("captured");
+        pushLog("腕を取られた。距離が消える。", "danger");
+      }else{
+        pushLog("間一髪で距離を取った。", "muted");
+      }
+    }else{
+      pushLog(`${c.name}は一瞬だけ、迷うような顔をした。`, "muted");
+      c.trust = clamp(c.trust + 1);
+      c.intimacy = clamp(c.intimacy + 1);
+    }
+    return;
+  }
+
+  if(targetId.startsWith("obj:")){
+    const obj=targetId.slice(4);
+    touched(obj);
+    pushLog(`触る：<span class="muted">${obj}</span>`);
+
+    if(S.location==="radio" && obj==="受信機"){
+      if(!S.flags.has("contact_possible")){
+        pushLog("ノイズの底に符丁。繋がる“窓”がある。", "ok");
+        S.flags.add("contact_possible");
+      }else{
+        pushLog("受信状態を整える。照合へ進めそうだ。", "muted");
+      }
+      return;
+    }
+
+    if(S.location==="dock" && obj==="輸送船"){
+      tryEscape();
+      return;
+    }
+
+    // 触るは音が出やすい
+    const p = 14 + LOC[S.location].danger/2 + (S.flags.has("detected_once")?6:0);
+    if(chance(p)){
+      markDetected("操作音が漏れた");
+      S.alert = clamp(S.alert+8);
+    }else{
+      pushLog("反応は薄い。", "muted");
+    }
+    return;
+  }
+
+  if(targetId.startsWith("sub:")){
+    pushLog("触れるが、意味は薄い。", "muted");
+  }
+}
+
+function pickupEvent(it){
+  const LSx = LS();
+  if(!LSx.revealed.has("item:"+it)){
+    pushLog("まだ見つけていない。", "muted");
+    return;
+  }
+  // 1回拾ったらその場から消える
+  LSx.revealed.delete("item:"+it);
+
+  if(it==="fuel_can"){
+    pushLog("燃料缶を確保した。<span class='ok'>燃料+8</span>", "ok");
+    S.fuel = Math.max(0, S.fuel + 8);
+    // 燃料を持ち歩く音/匂いで疑いが立つことも
+    if(chance(12)) markDetected("燃料の匂いが残った");
+    return;
+  }
+
+  if(it==="gate_key"){
+    pushLog("ゲート鍵を確保した。", "ok");
+    S.flags.add("has_gate_key");
+    addItem("gate_key");
+    // 鍵取得はかなり疑われやすい
+    if(chance(35)) markDetected("鍵の所在が動いた");
+    return;
+  }
+
+  if(it==="codebook"){
+    pushLog("暗号表を確保した。", "ok");
+    addItem("codebook");
+    return;
+  }
+
+  if(it==="scrap"){
+    pushLog("部品片を確保した。", "ok");
+    addItem("scrap");
+    return;
+  }
+
+  if(it==="cloth_tag"){
+    pushLog("タグ付き布片を確保した。", "ok");
+    addItem("cloth_tag");
+    return;
+  }
+
+  addItem(it);
+}
+
+function useEvent(targetId){
+  if(targetId.startsWith("it:")){
+    const it=targetId.slice(3);
+
+    if(it==="scrap"){
+      if(S.location==="workshop"){
+        removeItem("scrap");
+        S.flags.add("ship_repaired");
+        pushLog("部品が噛み合う。機関の息が戻る。<span class='ok'>整備完了</span>", "ok");
+      }else{
+        pushLog("工廠で使うべきだ。", "muted");
+      }
+      return;
+    }
+
+    if(it==="codebook"){
+      if(S.location==="radio" && S.flags.has("contact_possible")){
+        S.flags.add("route_confirmed");
+        pushLog("暗号表で照合。航路が確定する。<span class='ok'>航路確定</span>", "ok");
+      }else{
+        pushLog("無線室で照合すべきだ。", "muted");
+      }
+      return;
+    }
+
+    if(it==="gate_key"){
+      if(S.location==="dock"){
+        openGate();
+      }else{
+        pushLog("埠頭の封鎖ゲートで使うべきだ。", "muted");
+      }
+      return;
+    }
+
+    if(it==="cloth_tag"){
+      pushLog("布片の匂いを散らす。追跡が鈍るかもしれない。", "muted");
+      // cooled_once 相当を付与
+      S.flags.add("cooled_once");
+      S.alert = clamp(S.alert-3);
+      return;
+    }
+
+    pushLog("使い道がない。", "muted");
+    return;
+  }
+
+  if(targetId==="use:radio"){
+    if(S.location!=="radio"){ pushLog("ここでは無線照合ができない。", "muted"); return; }
+    if(!S.flags.has("contact_possible")){ pushLog("まず受信機を確かめる必要がある。", "muted"); return; }
+    if(hasItem("codebook")){
+      S.flags.add("route_confirmed");
+      pushLog("照合が一気に進む。<span class='ok'>航路確定</span>", "ok");
+    }else{
+      if(chance(30)){
+        S.flags.add("route_confirmed");
+        pushLog("不安定だが照合に成功。<span class='ok'>航路確定</span>", "ok");
+      }else{
+        pushLog("照合が足りない。暗号表が欲しい。", "muted");
+      }
+    }
+    return;
+  }
+
+  if(targetId==="use:repair"){
+    if(S.location!=="workshop"){ pushLog("ここでは整備ができない。", "muted"); return; }
+    if(S.flags.has("ship_repaired")){ pushLog("整備は完了している。", "muted"); return; }
+    if(hasItem("scrap")){
+      removeItem("scrap");
+      S.flags.add("ship_repaired");
+      pushLog("整備が通る。<span class='ok'>整備完了</span>", "ok");
+    }else{
+      pushLog("部品が足りない。部品片が必要だ。", "muted");
+    }
+    return;
+  }
+
+  if(targetId==="use:gate"){
+    if(S.location!=="dock"){ pushLog("ここでは封鎖ゲートがない。", "muted"); return; }
+    openGate(); return;
+  }
+
+  if(targetId==="use:ship"){
+    if(S.location!=="dock"){ pushLog("ここでは出港できない。", "muted"); return; }
+    tryEscape(); return;
+  }
+
+  pushLog("使えない。", "muted");
+}
+
+function openGate(){
+  if(S.flags.has("gate_opened")){ pushLog("封鎖は既に解除されている。", "muted"); return; }
+  if(S.flags.has("has_gate_key") || hasItem("gate_key")){
+    S.flags.add("gate_opened");
+    pushLog("封鎖ゲートが外れた。道が一本通る。<span class='ok'>封鎖解除</span>", "ok");
+    // 解除はほぼ確で疑われる
+    markDetected("封鎖が動いた");
+    S.alert = clamp(S.alert+6);
+  }else{
+    pushLog("鍵がない。資材庫か浴場を探れ。", "muted");
+  }
+}
+
+function tryEscape(){
+  const need = ["route_confirmed","ship_repaired","gate_opened"];
+  const miss = need.filter(f=>!S.flags.has(f));
+  if(miss.length){
+    pushLog("出港条件が揃っていない。", "muted");
+    pushLog(`不足：<span class="danger">${miss.join(", ")}</span>`, "danger");
+    return;
+  }
+  if(S.fuel < 30){
+    pushLog("燃料が足りない。", "muted");
+    return;
+  }
+  S.flags.add("escaped_mainland");
+  pushLog("出港する。波を割り、島影が遠ざかる。", "ok");
+}
+
+function socialEvent(cmdId, id){
+  const c=S.chars[id];
+  c.met=true;
+
+  const suspect = S.flags.has("detected_once");
+  const stance = stanceOf(id);
+
+  // 会話：疑われてるとまず詰問が入りやすい
+  if(cmdId==="talk"){
+    if(!c.met) c.met=true;
+    if(suspect && stance!=="味方寄り" && chance(55)){
+      pushLog(`${c.name}「提督、さっきから動きが不自然です」`, "danger");
+      S.alert = clamp(S.alert+6);
+      // ここで謝る/命令/隠れるに繋げる感じ
+    }else{
+      pushLog(talkLine(id), "muted");
+      c.trust = clamp(c.trust + 2);
+      c.intimacy = clamp(c.intimacy + 4);
+      if(c.intimacy>=100 && !c.bonded){ c.bonded=true; pushLog(`（${c.name}との関係が深くなった）`, "ok"); }
+      // たまに同行提案（信頼高い時だけ）
+      if(c.trust>=75 && !S.party.includes(id) && chance(22) && S.present.includes(id)){
+        pushLog(`${c.name}「……同行します。目立たないように」`, "ok");
+        S.party.push(id);
+        S.present = S.present.filter(x=>x!==id);
+      }
+    }
+    return;
+  }
+
+  if(cmdId==="apologize"){
+    pushLog(apologyLine(id), "muted");
+    c.trust = clamp(c.trust + 4);
+    c.intimacy = clamp(c.intimacy + 2);
+    S.alert = clamp(S.alert-4);
+    if(c.intimacy>=100 && !c.bonded){ c.bonded=true; pushLog(`（${c.name}との関係が深くなった）`, "ok"); }
+    return;
+  }
+
+  if(cmdId==="order"){
+    const min=CHAR[id].orderMin;
+    if(c.trust < min){
+      pushLog(`${c.name}は命令に渋い反応を返した。`, "muted");
+      c.trust = clamp(c.trust - 2);
+      S.alert = clamp(S.alert + 4);
+      // 強圧は疑いを濃くする
+      if(chance(30)) markDetected("強引さが目立った");
+      return;
+    }
+    pushLog(orderLine(id), "muted");
+    c.trust = clamp(c.trust + 1);
+
+    // 同行を明示的に成立させる（勝手に同行しない）
+    if(!S.party.includes(id) && S.present.includes(id) && c.trust>=70 && chance(45)){
+      pushLog(`${c.name}は短く頷き、一定の距離で付いてくる。<span class="ok">同行</span>`, "ok");
+      S.party.push(id);
+      S.present = S.present.filter(x=>x!==id);
+      return;
+    }
+
+    // 命令で目的進行が起きることもある（限定的）
+    if(S.location==="radio" && !S.flags.has("route_confirmed") && chance(20)){
+      S.flags.add("route_confirmed");
+      pushLog("手順が整い、照合が通る。<span class='ok'>航路確定</span>", "ok");
+    }
+    return;
+  }
+}
+
+function talkLine(id){
+  // 初回は状況説明寄り、後半で戦術寄りになる
+  const c=S.chars[id];
+  const first = !c.met || c.intimacy<10;
+  const mid = c.intimacy>=10 && c.intimacy<40;
+  const late = c.intimacy>=40;
+
+  const lines = {
+    shigure:{
+      first:["時雨「提督、夜は冷える。足元、気をつけて」","時雨「……何か探してる？」"],
+      mid:["時雨「見張りの癖がある。動線を割ると嫌がる」","時雨「焦らなくていい。静かに積む」"],
+      late:["時雨「僕は味方だよ。……でも、見つかったら止める」"],
+    },
+    asashio:{
+      first:["朝潮「提督、指示があれば伺います」","朝潮「今夜は静かですね…」"],
+      mid:["朝潮「規律を守るのが私の役目です」","朝潮「提督の意図…確認させてください」"],
+      late:["朝潮「…提督の決断なら、受け止めます」"],
+    },
+    kasumi:{
+      first:["霞「また、何か企んでる顔」","霞「いい？中途半端が一番危ない」"],
+      mid:["霞「逃げるなら、逃げるで筋を通して」","霞「言い訳は後。今は手を動かしなさい」"],
+      late:["霞「……止めたい。でも、提督を嫌いになれない」"],
+    },
+    takao:{
+      first:["高雄「提督、姿勢が崩れています。落ち着いて」","高雄「状況を整理しましょう」"],
+      mid:["高雄「鍵と手順。焦るほど露見します」","高雄「筋を通すなら、私が盾になります」"],
+      late:["高雄「本土へ？……貴方が選ぶなら、責は共に」"],
+    },
+    kongo:{
+      first:["金剛「Hey提督！顔、固いヨ！」","金剛「元気出すネ。でも静かにネ！」"],
+      mid:["金剛「派手はダメ。今日は“我慢”の日ネ」","金剛「提督が行くなら、私も行きたい…でも」"],
+      late:["金剛「止めるべきなのに、止めたくない…ズルいネ」"],
+    },
+    hatsuzuki:{
+      first:["初月「目的は？」","初月「余計な音は出さない方がいい」"],
+      mid:["初月「手順を積めば勝てる」","初月「合理的に。回り道は嫌いだ」"],
+      late:["初月「…見逃す条件はある。提督次第だ」"],
+    },
+    urakaze:{
+      first:["浦風「提督、無理しんさんな」","浦風「寒うない？」"],
+      mid:["浦風「整えると、道が出るけぇ」","浦風「焦りは顔に出るよ」"],
+      late:["浦風「提督を守りたい。でも、正しいとは言えん…」"],
+    },
+    ikazuchi:{
+      first:["雷「提督！大丈夫？無理しないで！」","雷「ね、いっしょに行こ。…静かにね」"],
+      mid:["雷「提督、隠れるの上手くなってきた！」","雷「でもさ…どこ行く気？」"],
+      late:["雷「止めたいのに…手を握りたい」"],
+    },
+    hibiki:{
+      first:["響「……」","響「静かに」"],
+      mid:["響「足音。そこが一番危ない」","響「見られなければ、負けない」"],
+      late:["響「提督。……私を置いていく？」"],
+    },
+  };
+
+  const pick = first? lines[id].first : mid? lines[id].mid : lines[id].late;
+  return pick[rint(pick.length)];
+}
+
+function apologyLine(id){
+  const map = {
+    kasumi:"霞「……まあ、謝れるだけマシ。次はちゃんと考えて」",
+    asashio:"朝潮「受け取りました。提督が誠実なら、私は支えます」",
+    shigure:"時雨「いいよ。でも次は同じことをしないで」",
+    hibiki:"響「……分かった」",
+    kongo:"金剛「No problem！取り返せばいいネ！」",
+    takao:"高雄「良い判断です。落ち着きを取り戻しましょう」",
+    hatsuzuki:"初月「反省は効率を上げる」",
+    urakaze:"浦風「うん。大丈夫。整えていこ」",
+    ikazuchi:"雷「うん！元気出して！」",
+  };
+  return map[id] ?? `${CHAR[id].name}は小さく頷いた。`;
+}
+
+function orderLine(id){
+  const map = {
+    asashio:"朝潮「了解。指示を」",
+    kasumi:"霞「……責任、取ってよね」",
+    hatsuzuki:"初月「合理的なら従う」",
+    hibiki:"響「……了解」",
+    kongo:"金剛「Okey！…音は抑えるネ」",
+    takao:"高雄「承知。護ります」",
+    urakaze:"浦風「うん、任せんさい」",
+    ikazuchi:"雷「まかせて！」",
+    shigure:"時雨「……分かった」",
+  };
+  return map[id] ?? `${CHAR[id].name}「……分かった」`;
+}
+
+/* =========================
+   Traps / Capture pressure
+========================= */
+function trapCheck(){
+  // 疑われてると捕縛圧が跳ねる：艦娘が「捕まえに来る」世界観
+  const base = LOC[S.location].danger + Math.floor(S.alert/10) + (S.flags.has("detected_once")?6:0);
+  const cool = S.flags.has("cooled_once") ? -4 : 0;
+  const p = clamp(6 + base*1.2 + cool, 0, 42); // 最大42%
+  if(!chance(p)) return;
+
+  const hostile = S.flags.has("detected_once");
+  const presentIds = [...S.present];
+  const pick = presentIds.length? presentIds[rint(presentIds.length)] : null;
+
+  // 追跡鈍化アイテムの影響
+  const blur = hasItem("cloth_tag") ? 10 : 0;
+
+  if(hostile && pick && chance(65 - blur)){
+    pushLog(`${CHAR[pick].name}の気配が近い。<span class="danger">捕縛の動き</span>`, "danger");
+    // その場で捕縛判定（簡易）。隠れる/謝るで回避しやすくなる設計。
+    const evade = (hasItem("cloth_tag")?12:0) + (S.flags.has("cooled_once")?8:0) + (S.alert<30?6:0);
+    if(chance(40 + evade)){
+      pushLog("紙一重でやり過ごした。", "ok");
+      S.alert = clamp(S.alert-3);
+    }else{
+      pushLog("距離が詰まる。腕を取られる。", "danger");
+      if(chance(55)) S.flags.add("captured");
+      else S.alert = clamp(S.alert+12);
+    }
+    return;
+  }
+
+  // 一般トラップ
+  const pool=[
+    ()=>{ markDetected("足音が拾われた"); S.alert=clamp(S.alert+10); },
+    ()=>{ S.alert=clamp(S.alert+8); pushLog("停電。影が濃くなる。", "muted"); },
+    ()=>{ markDetected("警報が一瞬鳴った"); S.alert=clamp(S.alert+14); },
+    ()=>{ if(S.fuel>0){ S.fuel=Math.max(0,S.fuel-4); pushLog("燃料が減っている…<span class='danger'>燃料-4</span>", "danger"); } },
+  ];
+  pool[rint(pool.length)]();
+}
+
+function pressureCheck(){
+  // 長引くほど不利
+  if(S.turn > 70 && chance(12)){
+    pushLog("包囲が締まっていく。", "danger");
+    S.alert = clamp(S.alert+6);
+  }
+  if(S.alert>=100){
+    S.flags.add("captured");
+  }
+}
+
+/* =========================
+   Ending
+========================= */
+function resolveEnding(){
+  const escaped = S.flags.has("escaped_mainland");
+  const captured = S.flags.has("captured");
+  const neverDetected = !S.flags.has("detected_once");
+
+  const [b,all]=bondedCount();
+  const allBonded = (all>0 && b===all);
+
+  if(allBonded && (escaped || captured)) return "king";
+  if(b>=5 && (escaped || captured)) return "harem";
+  if(escaped && neverDetected) return "dream";
+  if(escaped) return "normal";
+  if(captured) return "bad";
+  return null;
+}
+function endGame(id){
+  S.ended=true;
+  S.ending=id;
+  sep();
+  pushLog(`<b>${END[id]}</b>`, id==="bad" ? "danger":"ok");
+  pushLog(`<span class="muted small">MENU → 最初から / ロード で再開できます。</span>`, "muted");
+}
+
+function afterStep(){
+  // 出現更新：同行は別扱い。出現は一定確率で入れ替わる
+  if(!S.present.length || chance(28)) refreshPresent(true);
+
+  trapCheck();
+  pressureCheck();
+
+  const e = resolveEnding();
+  if(e) endGame(e);
+
+  renderTop();
+}
+
+/* =========================
+   Start / Save / Load
+========================= */
+function resetLogFromState(){
+  logEl.innerHTML="";
+  S.log.forEach(e=>{
+    const div=document.createElement("div");
+    if(e.cls) div.className=e.cls;
+    div.innerHTML=e.line;
+    logEl.appendChild(div);
+  });
+  logEl.scrollTop = logEl.scrollHeight + 9999;
+}
+
+function serialize(){
+  return {
+    seed:S.seed, turn:S.turn, alert:S.alert, fuel:S.fuel,
+    inventory:[...S.inventory], invLimit:S.invLimit,
+    location:S.location, present:[...S.present], party:[...S.party],
+    flags:[...S.flags],
+    chars:S.chars,
+    locState:Object.fromEntries(Object.keys(S.locState).map(k=>[
+      k,
+      {
+        examined:[...S.locState[k].examined],
+        touched:[...S.locState[k].touched],
+        revealed:[...S.locState[k].revealed],
+        depleted:[...S.locState[k].depleted],
+      }
+    ])),
+    log:S.log,
+    ended:S.ended, ending:S.ending
+  };
+}
+function hydrate(obj){
+  seed = obj.seed ?? seed;
+  rnd = mulberry32(seed);
+
+  S = defaultState();
+  S.seed=seed;
+  S.turn=obj.turn??0;
+  S.alert=obj.alert??10;
+  S.fuel=obj.fuel??25;
+  S.inventory=obj.inventory??[];
+  S.invLimit=obj.invLimit??8;
+  S.location=obj.location??"hq";
+  S.present=obj.present??[];
+  S.party=obj.party??[];
+  S.flags=new Set(obj.flags??[]);
+  S.chars=obj.chars??S.chars;
+
+  if(obj.locState){
+    Object.keys(obj.locState).forEach(k=>{
+      const v=obj.locState[k];
+      if(!S.locState[k]) return;
+      S.locState[k].examined = new Set(v.examined||[]);
+      S.locState[k].touched  = new Set(v.touched||[]);
+      S.locState[k].revealed = new Set(v.revealed||[]);
+      S.locState[k].depleted = new Set(v.depleted||[]);
+    });
+  }
+  S.log=obj.log??[];
+  S.ended=!!obj.ended;
+  S.ending=obj.ending??null;
+
+  resetLogFromState();
+  renderTop();
+}
+
+function newGame(keepSeed=false){
+  if(!keepSeed){
+    seed = (Date.now()>>>0) ^ 0xC0FFEE;
+  }
+  rnd = mulberry32(seed);
+  S = defaultState();
+  S.seed = seed;
+
+  pushLog("—— <b>離島鎮守府</b> ——");
+  pushLog("夜の潮が重い。ここを抜け、本土へ辿り着け。<br><span class='muted'>（航路/鍵/整備/封鎖解除 → 埠頭で出港）</span>");
+  enterLocation("hq");
+  renderTop();
+}
+
+function saveLocal(){
+  localStorage.setItem("island_escape_save", JSON.stringify(serialize()));
+  toast("セーブしました");
+}
+function loadLocal(){
+  const raw = localStorage.getItem("island_escape_save");
+  if(!raw){ toast("セーブがありません"); return; }
+  hydrate(JSON.parse(raw));
+  toast("ロードしました");
+}
+
+document.getElementById("btnMenu").onclick=()=>document.getElementById("menuWrap").classList.add("show");
+document.getElementById("menuClose").onclick=()=>document.getElementById("menuWrap").classList.remove("show");
+document.getElementById("btnSave").onclick=saveLocal;
+document.getElementById("btnLoad").onclick=loadLocal;
+document.getElementById("btnRestart").onclick=()=>{
+  document.getElementById("menuWrap").classList.remove("show");
+  newGame(false);
+};
+document.getElementById("btnReplay").onclick=()=>{
+  document.getElementById("menuWrap").classList.remove("show");
+  const keep = S.seed;
+  seed = keep;
+  rnd = mulberry32(seed);
+  S = defaultState();
+  S.seed = seed;
+  pushLog("—— <b>離島鎮守府</b> ——");
+  pushLog("同じ潮、同じ夜。違う一手で抜けろ。<br><span class='muted'>（同条件リプレイ）</span>");
+  enterLocation("hq");
+  renderTop();
+};
+document.getElementById("menuWrap").addEventListener("click",(e)=>{
+  if(e.target.id==="menuWrap") document.getElementById("menuWrap").classList.remove("show");
+});
+
+/* =========================
+   Boot
+========================= */
+newGame(false);
+</script>
+</body>
+</html>
