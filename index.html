@@ -234,33 +234,33 @@ function svgScene(title, a="#0b1020", b="#131a2d", accent="#69c0ff"){
 }
 
 const LOC = {
-  hq:{name:"司令室", exits:["radio","workshop","storage","quarters","watch"], img:()=>svgScene("司令室", "#0a0f1b","#151b2b"),
+  hq:{name:"司令室", canon:"bridge", exits:["radio","workshop","storage","quarters","watch"], img:()=>svgScene("司令室", "#0a0f1b","#151b2b"),
       situation:["机の角が冷たい。","紙の匂いが残っている。"], objects:["机","海図","書類棚"]},
-  radio:{name:"無線室", exits:["hq","watch"], img:()=>svgScene("無線室", "#080d18","#121a2e"),
+  radio:{name:"無線室", canon:"radio_room", exits:["hq","watch"], img:()=>svgScene("無線室", "#080d18","#121a2e"),
       situation:["ノイズが薄く、逆に不気味だ。","ランプの瞬きが規則正しい。"], objects:["受信機","暗号表の引き出し"]},
-  workshop:{name:"工廠", exits:["hq","dock","generator"], img:()=>svgScene("工廠", "#0a0d12","#1b1f2a"),
+  workshop:{name:"工廠", canon:"workshop", exits:["hq","dock","generator"], img:()=>svgScene("工廠", "#0a0d12","#1b1f2a"),
       situation:["油と金属の匂い。","工具の整列が逆に怖い。"], objects:["作業台","工具箱","予備部材棚"]},
-  storage:{name:"資材庫", exits:["hq","dock","warehouse"], img:()=>svgScene("資材庫", "#0b0b12","#1a1724"),
+  storage:{name:"資材庫", canon:"storage", exits:["hq","dock","warehouse"], img:()=>svgScene("資材庫", "#0b0b12","#1a1724"),
       situation:["棚の影が深い。","湿った木箱が並ぶ。"], objects:["戸棚","木箱","棚"]},
-  quarters:{name:"居住区", exits:["hq","mess","bath"], img:()=>svgScene("居住区", "#0d0f14","#1a2230"),
+  quarters:{name:"居住区", canon:"quarters", exits:["hq","mess","bath"], img:()=>svgScene("居住区", "#0d0f14","#1a2230"),
       situation:["生活の匂いが気配を呼ぶ。","寝台が整いすぎている。"], objects:["寝台","私物箱","カーテン"]},
-  mess:{name:"食堂", exits:["quarters","hq"], img:()=>svgScene("食堂", "#0c1016","#17212a"),
+  mess:{name:"食堂", canon:"mess", exits:["quarters","hq"], img:()=>svgScene("食堂", "#0c1016","#17212a"),
       situation:["食器の音が残っている気がする。","配膳口の奥が暗い。"], objects:["テーブル","配膳口"]},
-  watch:{name:"見張り台", exits:["hq","radio","yard"], img:()=>svgScene("見張り台", "#060c16","#14243a"),
+  watch:{name:"見張り台", canon:"watchtower", exits:["hq","radio","yard"], img:()=>svgScene("見張り台", "#060c16","#14243a"),
       situation:["風が冷たい。","視界が利くぶん、気を抜けない。"], objects:["双眼鏡","照明スイッチ","警鐘"]},
-  yard:{name:"中庭", exits:["watch","dock","armory","tunnel"], img:()=>svgScene("中庭", "#070b12","#1b1a26"),
+  yard:{name:"中庭", canon:"courtyard", exits:["watch","dock","armory","tunnel"], img:()=>svgScene("中庭", "#070b12","#1b1a26"),
       situation:["砂利が足音を売る。","外灯が揺れて影が伸びる。"], objects:["外灯","通路","排水溝"]},
-  armory:{name:"兵装庫", exits:["yard","dock"], img:()=>svgScene("兵装庫", "#0b0b10","#20161a"),
+  armory:{name:"兵装庫", canon:"armory", exits:["yard","dock"], img:()=>svgScene("兵装庫", "#0b0b10","#20161a"),
       situation:["金属臭が強い。","箱が多く、隠せるが危ない。"], objects:["兵装棚","木箱","固定具"]},
-  dock:{name:"埠頭", exits:["yard","workshop","storage","armory","tunnel"], img:()=>svgScene("埠頭", "#050a12","#0f2032"),
+  dock:{name:"埠頭", canon:"dock", exits:["yard","workshop","storage","armory","tunnel"], img:()=>svgScene("埠頭", "#050a12","#0f2032"),
       situation:["波が硬い音を立てる。","封鎖ゲートが道を塞ぐ。"], objects:["輸送船","封鎖ゲート","繋留杭"]},
-  bath:{name:"浴場", exits:["quarters"], img:()=>svgScene("浴場", "#0d0c14","#1b1b2a"),
+  bath:{name:"浴場", canon:"bath", exits:["quarters"], img:()=>svgScene("浴場", "#0d0c14","#1b1b2a"),
       situation:["湿気が残る。","足音が吸われる。"], objects:["脱衣棚","洗い場","鏡"]},
-  tunnel:{name:"連絡坑道", exits:["dock","yard","generator"], img:()=>svgScene("連絡坑道", "#080a10","#14161d"),
+  tunnel:{name:"連絡坑道", canon:"tunnel", exits:["dock","yard","generator"], img:()=>svgScene("連絡坑道", "#080a10","#14161d"),
       situation:["狭い。","配管の温度が高い。"], objects:["配管","点検口","ケーブル"]},
-  generator:{name:"発電室", exits:["workshop","tunnel"], img:()=>svgScene("発電室", "#070a10","#10151f"),
+  generator:{name:"発電室", canon:"generator_room", exits:["workshop","tunnel"], img:()=>svgScene("発電室", "#070a10","#10151f"),
       situation:["低い振動が腹に響く。","機械の唸りが耳に残る。"], objects:["制御盤","発電機","換気扇"]},
-  warehouse:{name:"外倉庫", exits:["yard","storage"], img:()=>svgScene("外倉庫", "#0a0a12","#1b1a2a"),
+  warehouse:{name:"外倉庫", canon:"warehouse", exits:["yard","storage"], img:()=>svgScene("外倉庫", "#0a0a12","#1b1a2a"),
       situation:["鉄扉が湿って滑る。","外気が冷たい。"], objects:["鉄扉","パレット","防水シート"]},
 };
 
@@ -638,8 +638,15 @@ const dialogueUI = (() => {
     choices.querySelectorAll("button").forEach(b=>{
       b.onclick=()=>{
         if(b.disabled) return;
-        Dialogue.applyChoice(npcId, context, b.dataset.k);
+        const res = Dialogue.applyChoice(npcId, context, b.dataset.k) || {};
         wrap.classList.remove("show");
+        if(res.continue){
+          // 次の返答（B会話など）へ継続：同シチュ内で往復を増やす
+          const nextCtx = res.context || context;
+          const npcText = Dialogue.npcLine(npcId, nextCtx);
+          if(npcText) pushLog(`<b>${S.chars[npcId].name}</b>：${stripHtml(npcText)}`);
+          return open(npcId, nextCtx, after);
+        }
         if(after){ const fn=after; after=null; fn(); }
       };
     });
@@ -1450,7 +1457,8 @@ const Dialogue = (() => {
     function ctxBase(context){
       const noticed = !!context.noticed;
       const inParty = S.party.includes("shigure");
-      const loc = S.location;
+      const locId = S.location;
+      const loc = (LOC[locId] && LOC[locId].canon) ? LOC[locId].canon : locId;
       const alert = S.alert;
       const suspect = S.suspect;
       const has = (f)=>S.flags.has(f);
@@ -1459,10 +1467,11 @@ const Dialogue = (() => {
 
       const tags = [];
       if(inParty) tags.push("party");
+      if(loc==="bridge") tags.push("bridge");
       if(suspect) tags.push("suspect");
       if(alert>=70) tags.push("high_alert");
       if(loc==="dock") tags.push("dock");
-      if(loc==="radio") tags.push("radio");
+      if(loc==="radio_room") tags.push("radio_room");
       if(loc==="workshop") tags.push("workshop");
       if(loc==="tunnel") tags.push("tunnel");
       if(!noticed) tags.push("unnoticed");
@@ -1488,6 +1497,17 @@ const Dialogue = (() => {
       D().metCount = (D().metCount||0) + 1;
       D().lastTurn = S.turn;
 
+      // 自動フォローアップ：Aの会話をするとBの会話が始まる（同シチュ内で複数往復）
+      if(!D().thread && D().topics){
+        if(D().topics.has("ask_patrol") && !D().topics.has("follow_patrol") && chance(60)){
+          D().topics.add("follow_patrol");
+          startThread("patrol_follow");
+        }else if(D().topics.has("soft_night") && !D().topics.has("soft_night_follow") && chance(55)){
+          D().topics.add("soft_night_follow");
+          startThread("soft_follow");
+        }
+      }
+
       if(D().thread) return npcLineThread(c);
 
       if(!c.suspect) return npcLineNormal(c);
@@ -1495,6 +1515,14 @@ const Dialogue = (() => {
     }
 
     function npcLineNormal(c){
+      if(c.loc==="bridge"){
+        return pick([
+          "時雨「司令室…灯りが落ち着かないね。書類の匂いが残ってる」",
+          "時雨「提督。ここは静かすぎる。静かだと、心の音が聞こえる」",
+          "時雨「司令室で動くなら、理由が要る。…君のために」",
+          "時雨「海図…まだ温かい。さっきまで指が走ってた？」",
+        ]);
+      }
       if(c.loc==="dock"){
         return pick([
           "時雨「……埠頭。夜の波は、音が大きいね」",
@@ -1502,7 +1530,7 @@ const Dialogue = (() => {
           "時雨「提督、ここは…見張りが来る」",
         ]);
       }
-      if(c.loc==="radio"){
+      if(c.loc==="radio_room"){
         return pick([
           "時雨「無線室…？　珍しいね」",
           "時雨「…音、聞いてる？」",
@@ -1545,7 +1573,7 @@ const Dialogue = (() => {
         startThread("dock_stop");
         return "時雨「……提督。そこは、行き止まりじゃない。…でも“帰り道”にもならない」";
       }
-      if(c.loc==="radio"){
+      if(c.loc==="radio_room"){
         startThread("radio_probe");
         return "時雨「無線。…誰に繋ぐつもり？」";
       }
@@ -1565,7 +1593,61 @@ const Dialogue = (() => {
       const th = D().thread;
       const st = D().stage;
 
-      if(th==="suspect_probe"){
+      if(th==="patrol_follow"){
+        if(st===0) return [
+          {key:"pf0_ack", label:"「分かった。任せる」", tag:"任せる"},
+          {key:"pf0_join", label:"「一緒に行く」", tag:"同行"},
+          {key:"pf0_detail", label:"「どこを見て回る？」", tag:"確認"},
+          {key:"pf0_end", label:"「…気にするな。戻れ」", tag:"切る"},
+        ];
+        return [
+          {key:"pf1_ok", label:"「気をつけて」", tag:"気遣い"},
+          {key:"pf1_tease", label:"「心配性だな」", tag:"からかう"},
+          {key:"pf1_end", label:"「戻るぞ」", tag:"終える"},
+        ];
+      }
+
+      if(th==="soft_follow"){
+        if(st===0) return [
+          {key:"sf0_ask", label:"「眠れないのか？」", tag:"聞く"},
+          {key:"sf0_quiet", label:"「…少し黙ってて」", tag:"静寂"},
+          {key:"sf0_apol", label:"「悪かった。夜に動きすぎた」", tag:"謝る"},
+          {key:"sf0_end", label:"「もう休め」", tag:"終える"},
+        ];
+        return [
+          {key:"sf1_soft", label:"「ここにいていい」", tag:"許す"},
+          {key:"sf1_strict", label:"「規律を守れ」", tag:"叱る"},
+          {key:"sf1_end", label:"「話は終わりだ」", tag:"終える"},
+        ];
+      }
+
+      if(th==="patrol_follow"){
+          if(st===0){
+            if(key==="pf0_ack"){ say("任せる。"); pushLog("時雨「了解。…提督は、灯りを落として」","muted"); trust(+1); calm(1); nextStage(); return; }
+            if(key==="pf0_join"){ say("一緒に行く。"); pushLog("時雨「…いいの？ …じゃあ、僕の後ろ。足音は小さく」","muted"); intimacy(+2); heat(2); nextStage(); return; }
+            if(key==="pf0_detail"){ say("どこを見て回る？"); pushLog("時雨「配管、甲板、そして…君の足取り」","muted"); trust(+1); heat(1); nextStage(); return; }
+            if(key==="pf0_end"){ say("気にするな。戻れ。"); pushLog("時雨「…了解。…でも、命令なら従う」","muted"); trust(-1); calm(2); endThread(); return; }
+          }else{
+            if(key==="pf1_ok"){ say("気をつけて。"); pushLog("時雨「うん。…優しいね」","muted"); trust(+2); calm(1); endThread(); return; }
+            if(key==="pf1_tease"){ say("心配性だな。"); pushLog("時雨「…そう。君のことは特に」","muted"); intimacy(+2); heat(2); endThread(); return; }
+            if(key==="pf1_end"){ say("戻るぞ。"); pushLog("時雨「了解。…おやすみ、提督」","muted"); calm(2); endThread(); return; }
+          }
+        }
+
+        if(th==="soft_follow"){
+          if(st===0){
+            if(key==="sf0_ask"){ say("眠れないのか？"); pushLog("時雨「眠れないわけじゃない。…確かめたいだけ」","muted"); intimacy(+1); heat(2); nextStage(); return; }
+            if(key==="sf0_quiet"){ say("…少し黙ってて。"); pushLog("時雨「…うん。静けさ、好きだ」","muted"); calm(2); nextStage(); return; }
+            if(key==="sf0_apol"){ say("悪かった。夜に動きすぎた。"); pushLog("時雨「謝らなくていい。…でも、次は僕に言って」","muted"); trust(+2); intimacy(+2); nextStage(); return; }
+            if(key==="sf0_end"){ say("もう休め。"); pushLog("時雨「…了解。…でも、君も」","muted"); calm(2); endThread(); return; }
+          }else{
+            if(key==="sf1_soft"){ say("ここにいていい。"); pushLog("時雨「…うん。…じゃあ、少しだけ」","muted"); intimacy(+3); heat(3); endThread(); return; }
+            if(key==="sf1_strict"){ say("規律を守れ。"); pushLog("時雨「分かった。…でも君も無茶しないで」","muted"); trust(+1); calm(2); endThread(); return; }
+            if(key==="sf1_end"){ say("話は終わりだ。"); pushLog("時雨「了解。……おやすみ、提督」","muted"); calm(2); endThread(); return; }
+          }
+        }
+
+        if(th==="suspect_probe"){{
         if(st===0) return "時雨「…“見回り”って言うなら、どこを？」";
         if(st===1) return "時雨「君が何かを隠してるなら、僕は止める。…優しさで」";
         return "時雨「提督。…次の一歩で、君の未来が変わる」";
@@ -1602,8 +1684,9 @@ const Dialogue = (() => {
       if(!c.suspect){
         opts.push({key:"patrol", label:"「見回りだ。すぐ戻る」", tag:"無難"});
         opts.push({key:"smalltalk", label:"「眠れなくてな」", tag:"弱音"});
-        opts.push({key:"ask", label:"「時雨はどうした？」", tag:"振る"});
-        if(c.tags.includes("radio") && !S.flags.has("route_confirmed"))
+        const askLabel = (c.loc==="bridge") ? "「時雨も見回りか？」" : (c.loc==="dock") ? "「ここにいる理由は？」" : "「時雨はどうした？」";
+        opts.push({key:"ask", label:askLabel, tag:"振る"});
+        if(c.tags.includes("radio_room") && !S.flags.has("route_confirmed"))
           opts.push({key:"radio_hint", label:"「無線…少し確認したい」", tag:"目的"});
         if(c.tags.includes("dock"))
           opts.push({key:"dock_check", label:"「埠頭の様子を見ただけだ」", tag:"確認"});
@@ -1627,6 +1710,32 @@ const Dialogue = (() => {
     function optionsThread(c){
       const th = D().thread;
       const st = D().stage;
+
+      if(th==="patrol_follow"){
+        if(st===0) return pick([
+          "時雨「了解。…でも、君が起きてると、艦が眠れない気がする」",
+          "時雨「任せて。巡回は静かな仕事だ。…静かなほど、危ない」",
+          "時雨「一周して戻る。君の灯りが消えるまで」",
+        ]);
+        return pick([
+          "時雨「…君が言うなら。戻る。…ただ、目は離さない」",
+          "時雨「気遣いは、嫌いじゃない。…でも、油断は嫌い」",
+          "時雨「心配？…そう。僕は心配性だ。君のことは特に」",
+        ]);
+      }
+
+      if(th==="soft_follow"){
+        if(st===0) return pick([
+          "時雨「眠れないわけじゃない。…眠る前に、確かめたいだけ」",
+          "時雨「夜は静かで、嘘が目立つ。…君の足音も」",
+          "時雨「君が動く夜は、波が騒ぐ。…だから見てる」",
+        ]);
+        return pick([
+          "時雨「…ここにいていい？ じゃあ、息が落ち着くまで」",
+          "時雨「規律ね。…分かった。けど君も、無茶はしないで」",
+          "時雨「終わり？…了解。……おやすみ、提督」",
+        ]);
+      }
 
       if(th==="suspect_probe"){
         if(st===0) return [
@@ -1843,7 +1952,7 @@ const Dialogue = (() => {
   }
 
   function applyChoice(id, context, key){
-    if(id==="shigure") return ShigureDialogue.applyChoice(context, key);
+    if(id==="shigure"){ ShigureDialogue.applyChoice(context, key); return {continue: !!(S.dialogue.shigure && S.dialogue.shigure.thread), context}; }
 
     const c = S.chars[id];
     c.met = true;
@@ -1933,6 +2042,7 @@ const Dialogue = (() => {
       }
       return;
     }
+    return {continue:false, context};
   }
 
   return { npcLine, options, applyChoice };
