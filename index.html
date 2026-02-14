@@ -1,8 +1,9 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="ja">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
 <title>離島鎮守府 脱出行（基礎コード / セクション分け版）</title>
 <style>
   :root{
@@ -60,125 +61,113 @@
   .toast.show{display:block}
 </style>
 </head>
-
 <body>
 <header>
-  <div class="title">離島鎮守府 脱出行（基礎コード / セクション分け版）</div>
-  <div class="sub">修正しやすいように「定数→状態→UI→遭遇→各コマンド→会話データ」の順に整理</div>
+<div class="title">離島鎮守府 脱出行（基礎コード / セクション分け版）</div>
+<div class="sub">修正しやすいように「定数→状態→UI→遭遇→各コマンド→会話データ」の順に整理</div>
 </header>
-
 <main>
-  <div class="card">
-    <div class="hd">
-      <div class="h" id="placeName">—</div>
-      <div class="pill"><span>ターン</span> <b id="turn">0</b></div>
-      <div class="pill"><span>警戒</span> <b id="alert">10</b></div>
-      <div class="pill"><span>燃料</span> <b id="fuel">25</b></div>
-      <div class="pill"><span>脱走疑い</span> <b id="suspect">なし</b></div>
-      <button class="right" style="width:auto" id="btnMenu">MENU</button>
-    </div>
-
-    <div class="bd">
-      <div class="sceneImg"><img id="sceneImg" alt="scene"></div>
-      <div class="hr"></div>
-
-      <div class="grid2">
-        <div>
-          <div class="small muted">目的</div>
-          <div id="objective" style="margin-top:4px">—</div>
-          <div class="hr"></div>
-          <div class="small muted">現在地の状況</div>
-          <div id="situation" style="margin-top:4px">—</div>
-        </div>
-        <div>
-          <div class="small muted">出現中</div>
-          <div id="present" style="margin-top:4px">—</div>
-          <div class="hr"></div>
-          <div class="small muted">同行</div>
-          <div id="party" style="margin-top:4px">—</div>
-          <div class="hr"></div>
-          <div class="small muted">所持品</div>
-          <div id="inv" style="margin-top:4px">—</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="row">
-    <div class="col card">
-      <div class="hd"><div class="h">ログ</div><div class="small muted">（新しいほど下）</div></div>
-      <div class="bd log" id="log"></div>
-    </div>
-
-    <div class="col" style="max-width:440px">
-      <div class="card">
-        <div class="hd"><div class="h">コマンド</div><div class="small muted">押す→対象選択</div></div>
-        <div class="bd"><div class="grid3" id="cmdGrid"></div></div>
-      </div>
-
-      <div class="card">
-        <div class="hd"><div class="h">艦娘</div><div class="small muted">信頼/親密</div></div>
-        <div class="bd" id="chars"></div>
-      </div>
-    </div>
-  </div>
+<div class="card">
+<div class="hd">
+<div class="h" id="placeName">—</div>
+<div class="pill"><span>ターン</span> <b id="turn">0</b></div>
+<div class="pill"><span>警戒</span> <b id="alert">10</b></div>
+<div class="pill"><span>燃料</span> <b id="fuel">25</b></div>
+<div class="pill"><span>脱走疑い</span> <b id="suspect">なし</b></div>
+<button class="right" id="btnMenu" style="width:auto">MENU</button>
+</div>
+<div class="bd">
+<div class="sceneImg"><img alt="scene" id="sceneImg"/></div>
+<div class="hr"></div>
+<div class="grid2">
+<div>
+<div class="small muted">目的</div>
+<div id="objective" style="margin-top:4px">—</div>
+<div class="hr"></div>
+<div class="small muted">現在地の状況</div>
+<div id="situation" style="margin-top:4px">—</div>
+</div>
+<div>
+<div class="small muted">出現中</div>
+<div id="present" style="margin-top:4px">—</div>
+<div class="hr"></div>
+<div class="small muted">同行</div>
+<div id="party" style="margin-top:4px">—</div>
+<div class="hr"></div>
+<div class="small muted">所持品</div>
+<div id="inv" style="margin-top:4px">—</div>
+</div>
+</div>
+</div>
+</div>
+<div class="row">
+<div class="col card">
+<div class="hd"><div class="h">ログ</div><div class="small muted">（新しいほど下）</div></div>
+<div class="bd log" id="log"></div>
+</div>
+<div class="col" style="max-width:440px">
+<div class="card">
+<div class="hd"><div class="h">コマンド</div><div class="small muted">押す→対象選択</div></div>
+<div class="bd"><div class="grid3" id="cmdGrid"></div></div>
+</div>
+<div class="card">
+<div class="hd"><div class="h">艦娘</div><div class="small muted">信頼/親密</div></div>
+<div class="bd" id="chars"></div>
+</div>
+</div>
+</div>
 </main>
-
 <!-- 対象選択モーダル -->
 <div class="modalWrap" id="targetWrap">
-  <div class="modal">
-    <div class="top">
-      <div class="t" id="targetTitle">—</div>
-      <button class="x" id="targetClose">閉じる</button>
-    </div>
-    <div class="body">
-      <div class="small muted" id="targetHint">—</div>
-      <div class="hr"></div>
-      <div class="grid2" id="targetGrid"></div>
-    </div>
-  </div>
+<div class="modal">
+<div class="top">
+<div class="t" id="targetTitle">—</div>
+<button class="x" id="targetClose">閉じる</button>
 </div>
-
+<div class="body">
+<div class="small muted" id="targetHint">—</div>
+<div class="hr"></div>
+<div class="grid2" id="targetGrid"></div>
+</div>
+</div>
+</div>
 <!-- 返答選択モーダル（NPC台詞はログに確定／返答だけ選ぶ） -->
 <div class="modalWrap" id="dlgWrap">
-  <div class="modal">
-    <div class="top">
-      <div class="t" id="dlgTitle">返答</div>
-      <button class="x" id="dlgClose">閉じる</button>
-    </div>
-    <div class="body">
-      <div class="small muted" id="dlgHint"></div>
-      <div class="hr"></div>
-      <div class="grid2" id="dlgChoices"></div>
-    </div>
-  </div>
+<div class="modal">
+<div class="top">
+<div class="t" id="dlgTitle">返答</div>
+<button class="x" id="dlgClose">閉じる</button>
 </div>
-
+<div class="body">
+<div class="small muted" id="dlgHint"></div>
+<div class="hr"></div>
+<div class="grid2" id="dlgChoices"></div>
+</div>
+</div>
+</div>
 <!-- メニュー -->
 <div class="modalWrap" id="menuWrap">
-  <div class="modal">
-    <div class="top">
-      <div class="t">MENU</div>
-      <button class="x" id="menuClose">閉じる</button>
-    </div>
-    <div class="body">
-      <div class="grid2">
-        <button id="btnSave">セーブ（端末）</button>
-        <button id="btnLoad">ロード（端末）</button>
-        <button id="btnRestart">最初から</button>
-        <button id="btnReplay">同条件で最初から（seed維持）</button>
-      </div>
-      <div class="hr"></div>
-      <div class="small muted">
-        ・端末セーブは localStorage 使用。<br>
-        ・同条件リプレイは調整に便利。<br>
-      </div>
-    </div>
-  </div>
+<div class="modal">
+<div class="top">
+<div class="t">MENU</div>
+<button class="x" id="menuClose">閉じる</button>
 </div>
-
+<div class="body">
+<div class="grid2">
+<button id="btnSave">セーブ（端末）</button>
+<button id="btnLoad">ロード（端末）</button>
+<button id="btnRestart">最初から</button>
+<button id="btnReplay">同条件で最初から（seed維持）</button>
+</div>
+<div class="hr"></div>
+<div class="small muted">
+        ・端末セーブは localStorage 使用。<br/>
+        ・同条件リプレイは調整に便利。<br/>
+</div>
+</div>
+</div>
+</div>
 <div class="toast" id="toast"></div>
-
 <script>
 /* =========================================================
    00) ここが「入口」：全部を一つの App にまとめる
@@ -258,12 +247,14 @@ const LOC = {
       situation:["湿気が残る。","足音が吸われる。"], objects:["脱衣棚","洗い場","鏡"]},
   tunnel:{name:"連絡坑道", canon:"tunnel", exits:["dock","yard","generator"], img:()=>svgScene("連絡坑道", "#080a10","#14161d"),
       situation:["狭い。","配管の温度が高い。"], objects:["配管","点検口","ケーブル"]},
-  generator:{name:"発電室", canon:"generator_room", exits:["workshop","tunnel"], img:()=>svgScene("発電室", "#070a10","#10151f"),
+  generator:{name:"発電室", canon:"generator", exits:["workshop","tunnel"], img:()=>svgScene("発電室", "#070a10","#10151f"),
       situation:["低い振動が腹に響く。","機械の唸りが耳に残る。"], objects:["制御盤","発電機","換気扇"]},
   warehouse:{name:"外倉庫", canon:"warehouse", exits:["yard","storage"], img:()=>svgScene("外倉庫", "#0a0a12","#1b1a2a"),
       situation:["鉄扉が湿って滑る。","外気が冷たい。"], objects:["鉄扉","パレット","防水シート"]},
 };
 
+
+function locCanon(locId){ return (LOC[locId] && LOC[locId].canon) ? LOC[locId].canon : locId; }
 const ITEMS = {
   scrap:{name:"部品片", desc:"工廠で整備に使う（有限）"},
   gate_key:{name:"ゲート鍵", desc:"埠頭の封鎖ゲート解除"},
@@ -638,15 +629,8 @@ const dialogueUI = (() => {
     choices.querySelectorAll("button").forEach(b=>{
       b.onclick=()=>{
         if(b.disabled) return;
-        const res = Dialogue.applyChoice(npcId, context, b.dataset.k) || {};
+        Dialogue.applyChoice(npcId, context, b.dataset.k);
         wrap.classList.remove("show");
-        if(res.continue){
-          // 次の返答（B会話など）へ継続：同シチュ内で往復を増やす
-          const nextCtx = res.context || context;
-          const npcText = Dialogue.npcLine(npcId, nextCtx);
-          if(npcText) pushLog(`<b>${S.chars[npcId].name}</b>：${stripHtml(npcText)}`);
-          return open(npcId, nextCtx, after);
-        }
         if(after){ const fn=after; after=null; fn(); }
       };
     });
@@ -803,9 +787,7 @@ function runCommand(cmdId, targetId){
   // 会話：対象選択した瞬間に NPC台詞をログへ確定 → 返答だけポップアップ
   if(cmdId==="talk" && targetId.startsWith("ch:")){
     const id=targetId.slice(3);
-    CmdTalk.begin(id);
-    // 返答選択後に afterStep() を呼ぶ
-    return dialogueUI.open(id, {noticed:true}, afterStep);
+    return CmdTalk.start(id, {noticed:true}, afterStep);
   }
 
   // 命令/隠れる/逃げる/闘う/謝る（必要なら会話に寄せる）
@@ -825,8 +807,7 @@ function runCommand(cmdId, targetId){
   if(cmdId==="apologize" && targetId.startsWith("ch:")){
     // 謝るは「会話の一種」にしてもOK。いまは簡易に talk と同じ流れへ寄せる。
     const id=targetId.slice(3);
-    CmdTalk.begin(id, {force:"apologize"});
-    return dialogueUI.open(id, {noticed:true, force:"apologize"}, afterStep);
+    return CmdTalk.start(id, {noticed:true, force:"apologize"}, afterStep);
   }
 
   pushLog("うまくいかない。", "muted");
@@ -1131,14 +1112,28 @@ const CmdDrop = {
 };
 
 const CmdTalk = {
-  // 対象を選んだ瞬間に「NPC台詞をログへ確定」
-  begin(id, ctx={}){
+  // 開始：NPCの第一声→返答→必要なら同シチュ継続（Aの後にB）
+  start(id, ctx={}, afterStep){
     const obj = S.present.find(o=>o.id===id);
-    if(obj) obj.noticed = true; // 話しかけた＝気づき確定
+    if(obj) obj.noticed = true;
     S.chars[id].met = true;
 
-    const npc = Dialogue.npcLine(id, {noticed:true, ...ctx});
-    pushLog(`<b>${S.chars[id].name}</b>：${stripHtml(npc)}`);
+    // まずNPCの台詞
+    const npc = Dialogue.npcLine(id, ctx);
+    if(npc) pushLog(`【${S.chars[id].name}】${npc}`);
+
+    // 返答選択→続くなら即もう一往復
+    const loop = ()=>{
+      return dialogueUI.open(id, ctx, ()=>{
+        if(Dialogue.shouldContinue && Dialogue.shouldContinue(id)){
+          const npc2 = Dialogue.npcLine(id, ctx);
+          if(npc2) pushLog(`【${S.chars[id].name}】${npc2}`);
+          return loop();
+        }
+        afterStep && afterStep();
+      });
+    };
+    return loop();
   }
 };
 
@@ -1458,7 +1453,7 @@ const Dialogue = (() => {
       const noticed = !!context.noticed;
       const inParty = S.party.includes("shigure");
       const locId = S.location;
-      const loc = (LOC[locId] && LOC[locId].canon) ? LOC[locId].canon : locId;
+      const loc = locCanon(locId);
       const alert = S.alert;
       const suspect = S.suspect;
       const has = (f)=>S.flags.has(f);
@@ -1467,11 +1462,10 @@ const Dialogue = (() => {
 
       const tags = [];
       if(inParty) tags.push("party");
-      if(loc==="bridge") tags.push("bridge");
       if(suspect) tags.push("suspect");
       if(alert>=70) tags.push("high_alert");
       if(loc==="dock") tags.push("dock");
-      if(loc==="radio_room") tags.push("radio_room");
+      if(loc==="radio_room") tags.push("radio");
       if(loc==="workshop") tags.push("workshop");
       if(loc==="tunnel") tags.push("tunnel");
       if(!noticed) tags.push("unnoticed");
@@ -1497,17 +1491,6 @@ const Dialogue = (() => {
       D().metCount = (D().metCount||0) + 1;
       D().lastTurn = S.turn;
 
-      // 自動フォローアップ：Aの会話をするとBの会話が始まる（同シチュ内で複数往復）
-      if(!D().thread && D().topics){
-        if(D().topics.has("ask_patrol") && !D().topics.has("follow_patrol") && chance(60)){
-          D().topics.add("follow_patrol");
-          startThread("patrol_follow");
-        }else if(D().topics.has("soft_night") && !D().topics.has("soft_night_follow") && chance(55)){
-          D().topics.add("soft_night_follow");
-          startThread("soft_follow");
-        }
-      }
-
       if(D().thread) return npcLineThread(c);
 
       if(!c.suspect) return npcLineNormal(c);
@@ -1515,14 +1498,6 @@ const Dialogue = (() => {
     }
 
     function npcLineNormal(c){
-      if(c.loc==="bridge"){
-        return pick([
-          "時雨「司令室…灯りが落ち着かないね。書類の匂いが残ってる」",
-          "時雨「提督。ここは静かすぎる。静かだと、心の音が聞こえる」",
-          "時雨「司令室で動くなら、理由が要る。…君のために」",
-          "時雨「海図…まだ温かい。さっきまで指が走ってた？」",
-        ]);
-      }
       if(c.loc==="dock"){
         return pick([
           "時雨「……埠頭。夜の波は、音が大きいね」",
@@ -1593,61 +1568,7 @@ const Dialogue = (() => {
       const th = D().thread;
       const st = D().stage;
 
-      if(th==="patrol_follow"){
-        if(st===0) return [
-          {key:"pf0_ack", label:"「分かった。任せる」", tag:"任せる"},
-          {key:"pf0_join", label:"「一緒に行く」", tag:"同行"},
-          {key:"pf0_detail", label:"「どこを見て回る？」", tag:"確認"},
-          {key:"pf0_end", label:"「…気にするな。戻れ」", tag:"切る"},
-        ];
-        return [
-          {key:"pf1_ok", label:"「気をつけて」", tag:"気遣い"},
-          {key:"pf1_tease", label:"「心配性だな」", tag:"からかう"},
-          {key:"pf1_end", label:"「戻るぞ」", tag:"終える"},
-        ];
-      }
-
-      if(th==="soft_follow"){
-        if(st===0) return [
-          {key:"sf0_ask", label:"「眠れないのか？」", tag:"聞く"},
-          {key:"sf0_quiet", label:"「…少し黙ってて」", tag:"静寂"},
-          {key:"sf0_apol", label:"「悪かった。夜に動きすぎた」", tag:"謝る"},
-          {key:"sf0_end", label:"「もう休め」", tag:"終える"},
-        ];
-        return [
-          {key:"sf1_soft", label:"「ここにいていい」", tag:"許す"},
-          {key:"sf1_strict", label:"「規律を守れ」", tag:"叱る"},
-          {key:"sf1_end", label:"「話は終わりだ」", tag:"終える"},
-        ];
-      }
-
-      if(th==="patrol_follow"){
-          if(st===0){
-            if(key==="pf0_ack"){ say("任せる。"); pushLog("時雨「了解。…提督は、灯りを落として」","muted"); trust(+1); calm(1); nextStage(); return; }
-            if(key==="pf0_join"){ say("一緒に行く。"); pushLog("時雨「…いいの？ …じゃあ、僕の後ろ。足音は小さく」","muted"); intimacy(+2); heat(2); nextStage(); return; }
-            if(key==="pf0_detail"){ say("どこを見て回る？"); pushLog("時雨「配管、甲板、そして…君の足取り」","muted"); trust(+1); heat(1); nextStage(); return; }
-            if(key==="pf0_end"){ say("気にするな。戻れ。"); pushLog("時雨「…了解。…でも、命令なら従う」","muted"); trust(-1); calm(2); endThread(); return; }
-          }else{
-            if(key==="pf1_ok"){ say("気をつけて。"); pushLog("時雨「うん。…優しいね」","muted"); trust(+2); calm(1); endThread(); return; }
-            if(key==="pf1_tease"){ say("心配性だな。"); pushLog("時雨「…そう。君のことは特に」","muted"); intimacy(+2); heat(2); endThread(); return; }
-            if(key==="pf1_end"){ say("戻るぞ。"); pushLog("時雨「了解。…おやすみ、提督」","muted"); calm(2); endThread(); return; }
-          }
-        }
-
-        if(th==="soft_follow"){
-          if(st===0){
-            if(key==="sf0_ask"){ say("眠れないのか？"); pushLog("時雨「眠れないわけじゃない。…確かめたいだけ」","muted"); intimacy(+1); heat(2); nextStage(); return; }
-            if(key==="sf0_quiet"){ say("…少し黙ってて。"); pushLog("時雨「…うん。静けさ、好きだ」","muted"); calm(2); nextStage(); return; }
-            if(key==="sf0_apol"){ say("悪かった。夜に動きすぎた。"); pushLog("時雨「謝らなくていい。…でも、次は僕に言って」","muted"); trust(+2); intimacy(+2); nextStage(); return; }
-            if(key==="sf0_end"){ say("もう休め。"); pushLog("時雨「…了解。…でも、君も」","muted"); calm(2); endThread(); return; }
-          }else{
-            if(key==="sf1_soft"){ say("ここにいていい。"); pushLog("時雨「…うん。…じゃあ、少しだけ」","muted"); intimacy(+3); heat(3); endThread(); return; }
-            if(key==="sf1_strict"){ say("規律を守れ。"); pushLog("時雨「分かった。…でも君も無茶しないで」","muted"); trust(+1); calm(2); endThread(); return; }
-            if(key==="sf1_end"){ say("話は終わりだ。"); pushLog("時雨「了解。……おやすみ、提督」","muted"); calm(2); endThread(); return; }
-          }
-        }
-
-        if(th==="suspect_probe"){{
+      if(th==="suspect_probe"){
         if(st===0) return "時雨「…“見回り”って言うなら、どこを？」";
         if(st===1) return "時雨「君が何かを隠してるなら、僕は止める。…優しさで」";
         return "時雨「提督。…次の一歩で、君の未来が変わる」";
@@ -1684,9 +1605,8 @@ const Dialogue = (() => {
       if(!c.suspect){
         opts.push({key:"patrol", label:"「見回りだ。すぐ戻る」", tag:"無難"});
         opts.push({key:"smalltalk", label:"「眠れなくてな」", tag:"弱音"});
-        const askLabel = (c.loc==="bridge") ? "「時雨も見回りか？」" : (c.loc==="dock") ? "「ここにいる理由は？」" : "「時雨はどうした？」";
-        opts.push({key:"ask", label:askLabel, tag:"振る"});
-        if(c.tags.includes("radio_room") && !S.flags.has("route_confirmed"))
+        opts.push({key:"ask", label:"「時雨はどうした？」", tag:"振る"});
+        if(c.tags.includes("radio") && !S.flags.has("route_confirmed"))
           opts.push({key:"radio_hint", label:"「無線…少し確認したい」", tag:"目的"});
         if(c.tags.includes("dock"))
           opts.push({key:"dock_check", label:"「埠頭の様子を見ただけだ」", tag:"確認"});
@@ -1710,32 +1630,6 @@ const Dialogue = (() => {
     function optionsThread(c){
       const th = D().thread;
       const st = D().stage;
-
-      if(th==="patrol_follow"){
-        if(st===0) return pick([
-          "時雨「了解。…でも、君が起きてると、艦が眠れない気がする」",
-          "時雨「任せて。巡回は静かな仕事だ。…静かなほど、危ない」",
-          "時雨「一周して戻る。君の灯りが消えるまで」",
-        ]);
-        return pick([
-          "時雨「…君が言うなら。戻る。…ただ、目は離さない」",
-          "時雨「気遣いは、嫌いじゃない。…でも、油断は嫌い」",
-          "時雨「心配？…そう。僕は心配性だ。君のことは特に」",
-        ]);
-      }
-
-      if(th==="soft_follow"){
-        if(st===0) return pick([
-          "時雨「眠れないわけじゃない。…眠る前に、確かめたいだけ」",
-          "時雨「夜は静かで、嘘が目立つ。…君の足音も」",
-          "時雨「君が動く夜は、波が騒ぐ。…だから見てる」",
-        ]);
-        return pick([
-          "時雨「…ここにいていい？ じゃあ、息が落ち着くまで」",
-          "時雨「規律ね。…分かった。けど君も、無茶はしないで」",
-          "時雨「終わり？…了解。……おやすみ、提督」",
-        ]);
-      }
 
       if(th==="suspect_probe"){
         if(st===0) return [
@@ -1898,7 +1792,17 @@ const Dialogue = (() => {
       if(key==="dock_back"){ say("ここは危ない。戻る。"); pushLog("時雨「…うん。埠頭は、答えが出てから」","muted"); calm(5); trust(+1); return; }
     }
 
-    return { npcLine, options, applyChoice };
+    function shouldContinue(npcId){
+    if(npcId==="shigure"){
+      const D = S.dlg.shigure;
+      if(!D.thread) return false;
+      const finalStage = 2; // 0,1,2（2が終幕）
+      return D.stage < finalStage;
+    }
+    return false;
+  }
+
+  return { npcLine, options, applyChoice, shouldContinue };
   })();
 
 
@@ -1952,7 +1856,7 @@ const Dialogue = (() => {
   }
 
   function applyChoice(id, context, key){
-    if(id==="shigure"){ ShigureDialogue.applyChoice(context, key); return {continue: !!(S.dialogue.shigure && S.dialogue.shigure.thread), context}; }
+    if(id==="shigure") return ShigureDialogue.applyChoice(context, key);
 
     const c = S.chars[id];
     c.met = true;
@@ -2042,10 +1946,19 @@ const Dialogue = (() => {
       }
       return;
     }
-    return {continue:false, context};
   }
 
-  return { npcLine, options, applyChoice };
+  function shouldContinue(npcId){
+    if(npcId==="shigure"){
+      const D = S.dlg.shigure;
+      if(!D.thread) return false;
+      const finalStage = 2; // 0,1,2（2が終幕）
+      return D.stage < finalStage;
+    }
+    return false;
+  }
+
+  return { npcLine, options, applyChoice, shouldContinue };
 })();
 /* =========================================================
    19) 起動処理とイベント配線
