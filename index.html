@@ -1442,7 +1442,6 @@ const Dialogue = (() => {
 
   /* =========================
      Shigure Dialogue Section
-     - 時雨専用の会話生成（連続会話 / 話題解禁）
   ========================= */
   const ShigureDialogue = (() => {
 
@@ -1455,7 +1454,6 @@ const Dialogue = (() => {
       const alert = S.alert;
       const suspect = S.suspect;
       const has = (f)=>S.flags.has(f);
-      const met = S.chars.shigure.met;
       const trust = S.chars.shigure.trust;
       const intimacy = S.chars.shigure.intimacy;
 
@@ -1475,7 +1473,7 @@ const Dialogue = (() => {
       if(has("gate_opened")) tags.push("gate_ok");
       if(S.flags.has("escaped_mainland")) tags.push("escaped");
 
-      return { noticed,inParty,loc,alert,suspect,met,trust,intimacy,tags };
+      return { noticed,inParty,loc,alert,suspect,trust,intimacy,tags };
     }
 
     function pick(arr){ return arr[rint(arr.length)]; }
@@ -1483,12 +1481,10 @@ const Dialogue = (() => {
     function startThread(id){ D().thread = id; D().stage = 0; }
     function nextStage(){ D().stage += 1; }
     function endThread(){ D().thread = null; D().stage = 0; }
-
     function touchTopic(t){ D().topics.add(t); }
 
     function npcLine(context){
       const c = ctxBase(context);
-
       D().metCount = (D().metCount||0) + 1;
       D().lastTurn = S.turn;
 
@@ -1536,6 +1532,7 @@ const Dialogue = (() => {
           "時雨「…今夜は、何を探してるの？」",
         ]);
       }
+
       return pick([
         "時雨「提督。夜更かし？」",
         "時雨「…こんな時間に動くと、空気が変わる」",
@@ -1556,7 +1553,6 @@ const Dialogue = (() => {
         startThread("workshop_probe");
         return "時雨「整備の音は残る。…君の“予定”も残るよ」";
       }
-
       startThread("suspect_probe");
       return pick([
         "時雨「……提督。行き先を、聞いていい？」",
@@ -1600,6 +1596,7 @@ const Dialogue = (() => {
       const c = ctxBase(context);
       const opts = [];
 
+      // スレッド中はスレッド専用
       if(D().thread) return optionsThread(c);
 
       if(!c.suspect){
@@ -1618,6 +1615,7 @@ const Dialogue = (() => {
         return opts;
       }
 
+      // suspect
       opts.push({key:"deny_soft", label:"「誤解だ。落ち着け」", tag:"否定"});
       opts.push({key:"explain", label:"「理由がある。聞くか？」", tag:"説明"});
       opts.push({key:"backoff", label:"「悪かった。戻る」", tag:"退く"});
@@ -1631,22 +1629,18 @@ const Dialogue = (() => {
       const st = D().stage;
 
       if(th==="suspect_probe"){
-        if(st===0){
-          return [
-            {key:"t0_patrol", label:"「見回り。ルート確認だけ」", tag:"無難"},
-            {key:"t0_honest", label:"「…戻りたい気分だった」", tag:"正直"},
-            {key:"t0_lie", label:"「ただの散歩だ」", tag:"誤魔化す"},
-            {key:"t0_end", label:"「やめよう。戻る」", tag:"退く"},
-          ];
-        }
-        if(st===1){
-          return [
-            {key:"t1_explain", label:"「不安なんだ。…だから確認してる」", tag:"説明"},
-            {key:"t1_apol", label:"「疑わせた。すまない」", tag:"謝る"},
-            {key:"t1_push", label:"「止めるなら止めろ」", tag:"強硬"},
-            {key:"t1_end", label:"「戻る」", tag:"退く"},
-          ];
-        }
+        if(st===0) return [
+          {key:"t0_patrol", label:"「見回り。ルート確認だけ」", tag:"無難"},
+          {key:"t0_honest", label:"「…戻りたい気分だった」", tag:"正直"},
+          {key:"t0_lie", label:"「ただの散歩だ」", tag:"誤魔化す"},
+          {key:"t0_end", label:"「やめよう。戻る」", tag:"退く"},
+        ];
+        if(st===1) return [
+          {key:"t1_explain", label:"「不安なんだ。…だから確認してる」", tag:"説明"},
+          {key:"t1_apol", label:"「疑わせた。すまない」", tag:"謝る"},
+          {key:"t1_push", label:"「止めるなら止めろ」", tag:"強硬"},
+          {key:"t1_end", label:"「戻る」", tag:"退く"},
+        ];
         return [
           {key:"t2_trust", label:"「時雨を信じる。手伝ってくれ」", tag:"協力"},
           {key:"t2_back", label:"「…分かった。やめる」", tag:"撤退"},
@@ -1654,20 +1648,16 @@ const Dialogue = (() => {
       }
 
       if(th==="radio_probe"){
-        if(st===0){
-          return [
-            {key:"r0_truth", label:"「航路を確かめるだけだ」", tag:"目的"},
-            {key:"r0_hide", label:"「何でもない」", tag:"隠す"},
-            {key:"r0_back", label:"「やめる」", tag:"退く"},
-          ];
-        }
-        if(st===1){
-          return [
-            {key:"r1_use", label:"「照合を進める」", tag:"実行"},
-            {key:"r1_stop", label:"「今日はやめる」", tag:"中断"},
-            {key:"r1_ask", label:"「時雨はどう思う？」", tag:"相談"},
-          ];
-        }
+        if(st===0) return [
+          {key:"r0_truth", label:"「航路を確かめるだけだ」", tag:"目的"},
+          {key:"r0_hide", label:"「何でもない」", tag:"隠す"},
+          {key:"r0_back", label:"「やめる」", tag:"退く"},
+        ];
+        if(st===1) return [
+          {key:"r1_use", label:"「照合を進める」", tag:"実行"},
+          {key:"r1_stop", label:"「今日はやめる」", tag:"中断"},
+          {key:"r1_ask", label:"「時雨はどう思う？」", tag:"相談"},
+        ];
         return [
           {key:"r2_partner", label:"「一緒に見てくれ」", tag:"協力"},
           {key:"r2_back", label:"「…戻る」", tag:"退く"},
@@ -1675,20 +1665,16 @@ const Dialogue = (() => {
       }
 
       if(th==="workshop_probe"){
-        if(st===0){
-          return [
-            {key:"w0_repair", label:"「整備が必要だ」", tag:"目的"},
-            {key:"w0_back", label:"「戻る」", tag:"退く"},
-            {key:"w0_lie", label:"「点検だ」", tag:"誤魔化す"},
-          ];
-        }
-        if(st===1){
-          return [
-            {key:"w1_use", label:"「部品を合わせる」", tag:"実行"},
-            {key:"w1_stop", label:"「今はやめる」", tag:"中断"},
-            {key:"w1_soft", label:"「…心配か？」", tag:"距離"},
-          ];
-        }
+        if(st===0) return [
+          {key:"w0_repair", label:"「整備が必要だ」", tag:"目的"},
+          {key:"w0_back", label:"「戻る」", tag:"退く"},
+          {key:"w0_lie", label:"「点検だ」", tag:"誤魔化す"},
+        ];
+        if(st===1) return [
+          {key:"w1_use", label:"「部品を合わせる」", tag:"実行"},
+          {key:"w1_stop", label:"「今はやめる」", tag:"中断"},
+          {key:"w1_soft", label:"「…心配か？」", tag:"距離"},
+        ];
         return [
           {key:"w2_trust", label:"「手伝ってくれ」", tag:"協力"},
           {key:"w2_back", label:"「…やめる」", tag:"撤退"},
@@ -1696,20 +1682,16 @@ const Dialogue = (() => {
       }
 
       if(th==="dock_stop"){
-        if(st===0){
-          return [
-            {key:"d0_back", label:"「戻る。触らない」", tag:"撤退"},
-            {key:"d0_truth", label:"「…帰りたい。だけど理由はある」", tag:"正直"},
-            {key:"d0_push", label:"「止めるなら、力づくで？」", tag:"強硬"},
-          ];
-        }
-        if(st===1){
-          return [
-            {key:"d1_explain", label:"「本土に着けば終わる。だから…」", tag:"説明"},
-            {key:"d1_apol", label:"「すまない。混乱してる」", tag:"謝る"},
-            {key:"d1_back", label:"「戻る」", tag:"撤退"},
-          ];
-        }
+        if(st===0) return [
+          {key:"d0_back", label:"「戻る。触らない」", tag:"撤退"},
+          {key:"d0_truth", label:"「…帰りたい。だけど理由はある」", tag:"正直"},
+          {key:"d0_push", label:"「止めるなら、力づくで？」", tag:"強硬"},
+        ];
+        if(st===1) return [
+          {key:"d1_explain", label:"「本土に着けば終わる。だから…」", tag:"説明"},
+          {key:"d1_apol", label:"「すまない。混乱してる」", tag:"謝る"},
+          {key:"d1_back", label:"「戻る」", tag:"撤退"},
+        ];
         return [
           {key:"d2_help", label:"「時雨、手を貸してくれ」", tag:"協力"},
           {key:"d2_back", label:"「…やめる」", tag:"撤退"},
@@ -1724,7 +1706,13 @@ const Dialogue = (() => {
       const say = (txt)=>pushLog(`<span class="muted">提督</span>：「${txt}」`);
 
       const trust = (v)=>{ c.trust = clamp(c.trust+v); };
-      const intimacy = (v)=>{ c.intimacy = clamp(c.intimacy+v); if(c.intimacy>=100 && !c.bonded){ c.bonded=true; pushLog("（時雨との関係が深くなった）","ok"); } };
+      const intimacy = (v)=>{
+        c.intimacy = clamp(c.intimacy+v);
+        if(c.intimacy>=100 && !c.bonded){
+          c.bonded=true;
+          pushLog("（時雨との関係が深くなった）","ok");
+        }
+      };
       const calm = (v)=>{ S.alert = clamp(S.alert - v); };
       const heat = (v)=>{ S.alert = clamp(S.alert + v); };
 
@@ -1767,12 +1755,11 @@ const Dialogue = (() => {
           if(key==="t2_back"){ say("…分かった。やめる。"); pushLog("時雨「…それでいい。今夜は、休もう」","ok"); calm(8); trust(+2); endThread(); return; }
         }
 
-        // thread 他はあなたの既存 applyThread を同じ要領で移植してOK
-        // ここは最低限 “落ちない状態” を優先して、残りは後で増築していけるようにしてある
+        // 他 thread は今は安全に畳む（落ちない優先）
         say("…戻る。"); endThread(); return;
       }
 
-      // 通常分岐（あなたの既存 applyChoice と同じ）
+      // 通常分岐
       if(key==="patrol"){ say("見回りだ。すぐ戻る。"); pushLog("時雨「……そっか。無理はしないで」","muted"); trust(+2); intimacy(+1); calm(2); return; }
       if(key==="smalltalk"){ say("眠れなくてな。"); pushLog("時雨「眠れない夜は、あるよ。…君だけじゃない」","muted"); trust(+1); intimacy(+3); calm(2); touchTopic("soft_night"); return; }
       if(key==="ask"){ say("時雨はどうした？"); pushLog("時雨「…見回り。君が動く夜は、波が騒ぐから」","muted"); trust(+2); intimacy(+2); return; }
@@ -1806,29 +1793,29 @@ const Dialogue = (() => {
   })();
 
 
-  // ---- ここから通常キャラ共通 ----
+  // ---- 非時雨：共通会話 ----
   function npcLine(id, context){
     if(id==="shigure") return ShigureDialogue.npcLine(context);
 
     const suspect = S.suspect;
-    const noticed = context.noticed;
+    const noticed = !!context.noticed;
 
     return ({
       asashio: suspect ? "朝潮「提督。行動理由を確認します」" : (noticed?"朝潮「提督。こんな時間に？」":"朝潮「……気配が…」"),
-      kasumi: suspect ? "霞「はぁ？また逃げる気？」" : (noticed?"霞「今夜は落ち着きないわね」":"霞「……誰かいるの？」"),
-      takao: suspect ? "高雄「提督。動きが不自然です。説明を」" : (noticed?"高雄「提督。お疲れですか」":"高雄「……そこですか？」"),
-      kongo: suspect ? "金剛「提督！Stop！どこ行くのネ！」" : (noticed?"金剛「Hey提督！眠れない？」":"金剛「誰かいるヨ！」"),
-      hatsuzuki: suspect ? "初月「提督。目的を言え」" : (noticed?"初月「提督。行動が多い」":"初月「……誰だ」"),
+      kasumi:  suspect ? "霞「はぁ？また逃げる気？」" : (noticed?"霞「今夜は落ち着きないわね」":"霞「……誰かいるの？」"),
+      takao:   suspect ? "高雄「提督。動きが不自然です。説明を」" : (noticed?"高雄「提督。お疲れですか」":"高雄「……そこですか？」"),
+      kongo:   suspect ? "金剛「提督！Stop！どこ行くのネ！」" : (noticed?"金剛「Hey提督！眠れない？」":"金剛「誰かいるヨ！」"),
+      hatsuzuki:suspect ? "初月「提督。目的を言え」" : (noticed?"初月「提督。行動が多い」":"初月「……誰だ」"),
       urakaze: suspect ? "浦風「提督…無茶したらいけんよ」" : (noticed?"浦風「提督、寒うない？」":"浦風「…提督？」"),
-      ikazuchi: suspect ? "雷「提督！待って！どこ行くの！？」" : (noticed?"雷「提督、どうしたの？」":"雷「えっ、誰？」"),
-      hibiki: suspect ? "響「……止まれ」" : (noticed?"響「……夜だ」":"響「……気配」"),
+      ikazuchi:suspect ? "雷「提督！待って！どこ行くの！？」" : (noticed?"雷「提督、どうしたの？」":"雷「えっ、誰？」"),
+      hibiki:  suspect ? "響「……止まれ」" : (noticed?"響「……夜だ」":"響「……気配」"),
     })[id] || "……";
   }
 
   function options(id, context){
     if(id==="shigure") return ShigureDialogue.options(context);
 
-    const c=S.chars[id];
+    const c = S.chars[id];
     const opts = [];
 
     if(context.force==="apologize"){
@@ -1841,67 +1828,26 @@ const Dialogue = (() => {
     opts.push({key:"lie", label:"「眠れなくて散歩してた」", tag:"誤魔化す"});
     opts.push({key:"back", label:"「悪い、戻る」", tag:"退く"});
 
-    if(c.trust>=70 && !S.party.includes(id)) opts.push({key:"join", label:"「一緒に来てくれ」", tag:"同行"});
+    if(c.trust>=70 && !S.party.includes(id))
+      opts.push({key:"join", label:"「一緒に来てくれ」", tag:"同行"});
+
     if(S.suspect){
       opts.push({key:"explain", label:"「誤解だ。理由がある」", tag:"説明"});
       opts.push({key:"apologize", label:"「疑わせたならすまない」", tag:"謝る"});
     }
-    if(c.intimacy>=30) opts.push({key:"soft", label:"「心配してくれて助かる」", tag:"距離を詰める"});
+
+    if(c.intimacy>=30)
+      opts.push({key:"soft", label:"「心配してくれて助かる」", tag:"距離を詰める"});
+
     return opts;
   }
 
   function applyChoice(id, context, key){
     if(id==="shigure") return ShigureDialogue.applyChoice(context, key);
 
-    // ここはあなたの既存 applyChoice(非時雨) をそのまま残してOK
-    // （中身省略：既存を移植して）
-  }
+    const c = S.chars[id];
+    c.met = true;
 
-  return { npcLine, options, applyChoice };
-})();
-
-    return base;
-  }
-
-  function options(id, context){
-   if(id==="shigure") return ShigureDialogue.options(context);
- const c=S.chars[id];
-    const opts = [];
-
-    // 謝るに寄せたい時（apologize コマンドなど）
-    if(context.force==="apologize"){
-      opts.push({key:"apologize", label:"「疑わせたならすまない」", tag:"謝る"});
-      opts.push({key:"back", label:"「戻る」", tag:"退く"});
-      return opts;
-    }
-
-    // 基本の会話
-    opts.push({key:"neutral", label:"「ちょっと見回りだ」", tag:"無難"});
-    opts.push({key:"lie", label:"「眠れなくて散歩してた」", tag:"誤魔化す"});
-    opts.push({key:"back", label:"「悪い、戻る」", tag:"退く"});
-
-    if(c.trust>=70 && !S.party.includes(id)){
-      opts.push({key:"join", label:"「一緒に来てくれ」", tag:"同行"});
-    }
-
-    if(S.suspect){
-      opts.push({key:"explain", label:"「誤解だ。理由がある」", tag:"説明"});
-      opts.push({key:"apologize", label:"「疑わせたならすまない」", tag:"謝る"});
-    }
-
-    if(c.intimacy>=30){
-      opts.push({key:"soft", label:"「心配してくれて助かる」", tag:"距離を詰める"});
-    }
-
-    return opts;
-  }
-
-  function applyChoice(id, context, key){
-   if(id==="shigure") return ShigureDialogue.applyChoice(context, key);
- const c=S.chars[id];
-    c.met=true;
-
-    // プレイヤー台詞ログ
     const say = (txt)=>pushLog(`<span class="muted">提督</span>：「${txt}」`);
 
     if(key==="neutral"){
@@ -1991,7 +1937,6 @@ const Dialogue = (() => {
 
   return { npcLine, options, applyChoice };
 })();
-
 /* =========================================================
    19) 起動処理とイベント配線
 ========================================================= */
