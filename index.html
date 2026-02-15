@@ -206,50 +206,122 @@ const CHAR = {
 };
 
 // 内蔵の簡易背景（あとで画像に差し替え可）
-function svgScene(title, a="#0b1020", b="#131a2d", accent="#69c0ff"){
+function phaseOfHour(h){
+  // h: 0..24
+  if(h>=5 && h<8) return "early";      // 早朝
+  if(h>=8 && h<11) return "morning";   // 朝
+  if(h>=11 && h<16) return "noon";     // 昼
+  if(h>=16 && h<19) return "evening";  // 夕
+  if(h>=19 || h<0) return "night";
+  return "night";
+}
+function paletteForHour(h){
+  // 空の色（上→下）
+  const p = phaseOfHour(h);
+  if(p==="early")   return {skyA:"#13224a", skyB:"#ffb37a", haze:"#ffd7b0", star:0.20, sun:0.35, moon:0.70};
+  if(p==="morning") return {skyA:"#4b8bd6", skyB:"#bfe6ff", haze:"#ffffff", star:0.06, sun:0.90, moon:0.15};
+  if(p==="noon")    return {skyA:"#2b79e6", skyB:"#b8e5ff", haze:"#ffffff", star:0.00, sun:1.00, moon:0.00};
+  if(p==="evening") return {skyA:"#2a2d6e", skyB:"#ff7b61", haze:"#ffd0c2", star:0.10, sun:0.55, moon:0.35};
+  // night
+  return {skyA:"#060a16", skyB:"#111a2f", haze:"#8fb6ff", star:0.55, sun:0.00, moon:1.00};
+}
+function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+function lerp(a,b,t){ return a + (b-a)*t; }
+
+function sunMoonForHour(h){
+  // 太陽: 6->18, 月: 18->6
+  const sunUp = (h>=6 && h<18);
+  const t = sunUp ? (h-6)/12 : ((h>=18? h-18 : h+6)/12); // 0..1
+  // 半円軌道（上にふくらむ）
+  const x = lerp(140, 1060, t);
+  const y = 420 - (Math.sin(Math.PI*t)*260); // 420 -> 160 -> 420
+  return {sunUp, t, x, y};
+}
+
+// 内蔵の簡易背景（時間帯で空/太陽/月を変える）
+function svgScene(title, hour=21, a="#0b1020", b="#131a2d", accent="#69c0ff"){
+  const pal = paletteForHour(hour);
+  const cel = sunMoonForHour(hour);
+
+  // 星（夜だけ強め）
+  const stars = [];
+  const starN = Math.floor(30 + pal.star*70);
+  for(let i=0;i<starN;i++){
+    // 擬似乱数っぽい配置（タイトルに依存して固定化）
+    const k = (i*97 + title.length*31) % 997;
+    const x = 20 + (k % 1160);
+    const y = 20 + ((k*7) % 260);
+    const r = 0.8 + ((k*3)%10)/10;
+    const op = 0.08 + pal.star*0.22 + ((k%13)/80);
+    stars.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="#e9edf4" opacity="${op.toFixed(3)}"/>`);
+  }
+
+  const sun = `<circle cx="${cel.x}" cy="${cel.y}" r="54" fill="#ffd48a" opacity="${pal.sun}"/>
+               <circle cx="${cel.x+16}" cy="${cel.y-10}" r="86" fill="#ffd48a" opacity="${(pal.sun*0.22).toFixed(3)}"/>`;
+  const moon = `<circle cx="${cel.x}" cy="${cel.y}" r="44" fill="#dbe7ff" opacity="${pal.moon}"/>
+                <circle cx="${cel.x+16}" cy="${cel.y-8}" r="44" fill="${pal.skyA}" opacity="${(pal.moon*0.85).toFixed(3)}"/>`;
+
   const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/>
-  </linearGradient></defs>
-  <rect width="1200" height="600" fill="url(#g)"/>
-  <circle cx="980" cy="120" r="70" fill="${accent}" opacity="0.18"/>
-  <circle cx="1060" cy="180" r="110" fill="${accent}" opacity="0.10"/>
-  <path d="M0,430 C250,350 420,520 650,455 C870,390 960,520 1200,430 L1200,600 L0,600 Z" fill="#0a0c12" opacity="0.65"/>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${pal.skyA}"/><stop offset="1" stop-color="${pal.skyB}"/>
+    </linearGradient>
+    <linearGradient id="loc" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/>
+    </linearGradient>
+    <radialGradient id="haze" cx="70%" cy="20%" r="60%">
+      <stop offset="0" stop-color="${pal.haze}" stop-opacity="${(0.22 + pal.sun*0.08).toFixed(3)}"/>
+      <stop offset="1" stop-color="${pal.haze}" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="600" fill="url(#sky)"/>
+  <rect width="1200" height="600" fill="url(#haze)"/>
+  ${stars.join("\n")}
+
+  ${cel.sunUp ? sun : moon}
+
+  <circle cx="980" cy="120" r="70" fill="${accent}" opacity="0.12"/>
+  <circle cx="1060" cy="180" r="110" fill="${accent}" opacity="0.08"/>
+
+  <path d="M0,430 C250,350 420,520 650,455 C870,390 960,520 1200,430 L1200,600 L0,600 Z" fill="url(#loc)" opacity="0.72"/>
+  <path d="M0,465 C220,410 420,560 650,505 C900,450 980,560 1200,465 L1200,600 L0,600 Z" fill="#06070c" opacity="0.45"/>
+
   <text x="36" y="70" fill="#e9edf4" font-size="44" font-family="system-ui, sans-serif" opacity="0.92">${title}</text>
-  <text x="38" y="110" fill="#a9b2c3" font-size="22" font-family="system-ui, sans-serif" opacity="0.85">離島鎮守府 — 夜</text>
+  <text x="38" y="110" fill="#a9b2c3" font-size="22" font-family="system-ui, sans-serif" opacity="0.85">離島鎮守府</text>
 </svg>`;
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 
 const LOC = {
-  hq:{name:"司令室", canon:"bridge", exits:["radio","workshop","storage","quarters","watch"], img:()=>svgScene("司令室", "#0a0f1b","#151b2b"),
+  hq:{name:"司令室", canon:"bridge", exits:["radio","workshop","storage","quarters","watch"], img:(h)=>svgScene("司令室", h, "#0a0f1b","#151b2b"),
       situation:["机の角が冷たい。","紙の匂いが残っている。"], objects:["机","海図","書類棚"]},
-  radio:{name:"無線室", canon:"radio_room", exits:["hq","watch"], img:()=>svgScene("無線室", "#080d18","#121a2e"),
+  radio:{name:"無線室", canon:"radio_room", exits:["hq","watch"], img:(h)=>svgScene("無線室", h, "#080d18","#121a2e"),
       situation:["ノイズが薄く、逆に不気味だ。","ランプの瞬きが規則正しい。"], objects:["受信機","暗号表の引き出し"]},
-  workshop:{name:"工廠", canon:"workshop", exits:["hq","dock","generator"], img:()=>svgScene("工廠", "#0a0d12","#1b1f2a"),
+  workshop:{name:"工廠", canon:"workshop", exits:["hq","dock","generator"], img:(h)=>svgScene("工廠", h, "#0a0d12","#1b1f2a"),
       situation:["油と金属の匂い。","工具の整列が逆に怖い。"], objects:["作業台","工具箱","予備部材棚"]},
-  storage:{name:"資材庫", canon:"storage", exits:["hq","dock","warehouse"], img:()=>svgScene("資材庫", "#0b0b12","#1a1724"),
+  storage:{name:"資材庫", canon:"storage", exits:["hq","dock","warehouse"], img:(h)=>svgScene("資材庫", h, "#0b0b12","#1a1724"),
       situation:["棚の影が深い。","湿った木箱が並ぶ。"], objects:["戸棚","木箱","棚"]},
-  quarters:{name:"居住区", canon:"quarters", exits:["hq","mess","bath"], img:()=>svgScene("居住区", "#0d0f14","#1a2230"),
+  quarters:{name:"居住区", canon:"quarters", exits:["hq","mess","bath"], img:(h)=>svgScene("居住区", h, "#0d0f14","#1a2230"),
       situation:["生活の匂いが気配を呼ぶ。","寝台が整いすぎている。"], objects:["寝台","私物箱","カーテン"]},
-  mess:{name:"食堂", canon:"mess", exits:["quarters","hq"], img:()=>svgScene("食堂", "#0c1016","#17212a"),
+  mess:{name:"食堂", canon:"mess", exits:["quarters","hq"], img:(h)=>svgScene("食堂", h, "#0c1016","#17212a"),
       situation:["食器の音が残っている気がする。","配膳口の奥が暗い。"], objects:["テーブル","配膳口"]},
-  watch:{name:"見張り台", canon:"watchtower", exits:["hq","radio","yard"], img:()=>svgScene("見張り台", "#060c16","#14243a"),
+  watch:{name:"見張り台", canon:"watchtower", exits:["hq","radio","yard"], img:(h)=>svgScene("見張り台", h, "#060c16","#14243a"),
       situation:["風が冷たい。","視界が利くぶん、気を抜けない。"], objects:["双眼鏡","照明スイッチ","警鐘"]},
-  yard:{name:"中庭", canon:"courtyard", exits:["watch","dock","armory","tunnel"], img:()=>svgScene("中庭", "#070b12","#1b1a26"),
+  yard:{name:"中庭", canon:"courtyard", exits:["watch","dock","armory","tunnel"], img:(h)=>svgScene("中庭", h, "#070b12","#1b1a26"),
       situation:["砂利が足音を売る。","外灯が揺れて影が伸びる。"], objects:["外灯","通路","排水溝"]},
-  armory:{name:"兵装庫", canon:"armory", exits:["yard","dock"], img:()=>svgScene("兵装庫", "#0b0b10","#20161a"),
+  armory:{name:"兵装庫", canon:"armory", exits:["yard","dock"], img:(h)=>svgScene("兵装庫", h, "#0b0b10","#20161a"),
       situation:["金属臭が強い。","箱が多く、隠せるが危ない。"], objects:["兵装棚","木箱","固定具"]},
-  dock:{name:"埠頭", canon:"dock", exits:["yard","workshop","storage","armory","tunnel"], img:()=>svgScene("埠頭", "#050a12","#0f2032"),
+  dock:{name:"埠頭", canon:"dock", exits:["yard","workshop","storage","armory","tunnel"], img:(h)=>svgScene("埠頭", h, "#050a12","#0f2032"),
       situation:["波が硬い音を立てる。","封鎖ゲートが道を塞ぐ。"], objects:["輸送船","封鎖ゲート","繋留杭"]},
-  bath:{name:"浴場", canon:"bath", exits:["quarters"], img:()=>svgScene("浴場", "#0d0c14","#1b1b2a"),
+  bath:{name:"浴場", canon:"bath", exits:["quarters"], img:(h)=>svgScene("浴場", h, "#0d0c14","#1b1b2a"),
       situation:["湿気が残る。","足音が吸われる。"], objects:["脱衣棚","洗い場","鏡"]},
-  tunnel:{name:"連絡坑道", canon:"tunnel", exits:["dock","yard","generator"], img:()=>svgScene("連絡坑道", "#080a10","#14161d"),
+  tunnel:{name:"連絡坑道", canon:"tunnel", exits:["dock","yard","generator"], img:(h)=>svgScene("連絡坑道", h, "#080a10","#14161d"),
       situation:["狭い。","配管の温度が高い。"], objects:["配管","点検口","ケーブル"]},
-  generator:{name:"発電室", canon:"generator", exits:["workshop","tunnel"], img:()=>svgScene("発電室", "#070a10","#10151f"),
+  generator:{name:"発電室", canon:"generator", exits:["workshop","tunnel"], img:(h)=>svgScene("発電室", h, "#070a10","#10151f"),
       situation:["低い振動が腹に響く。","機械の唸りが耳に残る。"], objects:["制御盤","発電機","換気扇"]},
-  warehouse:{name:"外倉庫", canon:"warehouse", exits:["yard","storage"], img:()=>svgScene("外倉庫", "#0a0a12","#1b1a2a"),
+  warehouse:{name:"外倉庫", canon:"warehouse", exits:["yard","storage"], img:(h)=>svgScene("外倉庫", h, "#0a0a12","#1b1a2a"),
       situation:["鉄扉が湿って滑る。","外気が冷たい。"], objects:["鉄扉","パレット","防水シート"]},
 };
 
@@ -285,6 +357,12 @@ const clamp=(v,min=0,max=100)=>Math.max(min,Math.min(max,v));
    03) 状態（ゲーム進行のデータ）
    - 新しい要素は S の中に足す
 ========================================================= */
+
+// 時間：コマンド20回で6時間（数値表示なし、背景だけに反映）
+const HOURS_PER_CMD = 6/20; // 0.3h
+const START_HOUR = 21;      // ゲーム開始は夜
+function clockHour(){ return (START_HOUR + (S?.turn||0)*HOURS_PER_CMD) % 24; }
+
 function defaultState(){
   const chars = {};
   Object.keys(CHAR).forEach(id=>{
@@ -439,7 +517,7 @@ function renderTop(){
   el.present.innerHTML = presentText();
   el.party.innerHTML = partyText();
   el.inv.innerHTML = invText();
-  el.sceneImg.src = LOC[S.location].img();
+  el.sceneImg.src = LOC[S.location].img(clockHour());
   renderChars();
 }
 
@@ -648,6 +726,274 @@ const dialogueUI = (() => {
 
   return { open, close };
 })();
+
+/* =========================
+   Scripted chatScene runner
+   - NPC行はログに自動表示
+   - 提督行はポップアップで「押して」表示
+   - chatSceneTitle（番号/タイトル）は表示しない
+========================= */
+const playerLineUI = (() => {
+  // Reuse the existing "返答選択モーダル" UI so it appears like the original pop-up.
+  const wrap = document.getElementById("dlgWrap");
+  const titleEl = document.getElementById("dlgTitle");
+  const hintEl  = document.getElementById("dlgHint");
+  const choicesEl = document.getElementById("dlgChoices");
+  const closeBtn = document.getElementById("dlgClose");
+
+  let active = false;
+  let prevTitle = "";
+  let prevHint = "";
+
+  function restore(){
+    if(!active) return;
+    titleEl.textContent = prevTitle || "返答";
+    hintEl.textContent  = prevHint || "";
+    choicesEl.innerHTML = "";
+    active = false;
+  }
+
+  // If user closes the modal while in "player line" mode, restore UI text.
+  closeBtn.addEventListener("click", restore);
+  wrap.addEventListener("click", (e)=>{ if(e.target && e.target.id==="dlgWrap") restore(); });
+
+  function cleanPlayerChoiceLabel(s){
+
+
+    let x = String(s||"");
+
+
+    const cut1 = x.indexOf("時雨「");
+
+
+    if(cut1>0) x = x.slice(0, cut1).trim();
+
+
+    const cut2 = x.indexOf("\n時雨");
+
+
+    if(cut2>0) x = x.slice(0, cut2).trim();
+
+
+    return x;
+
+
+  }
+
+
+
+  function open(arg1, arg2){
+    // Backward compatible:
+    // - open(lines, onPick)
+    // - open({title, hint, choices, onPick})
+    let title="提督";
+    let hint="発言して進める";
+    let choices=null;
+    let onPick=null;
+
+    if(typeof arg1 === "object" && !Array.isArray(arg1)){
+      title   = arg1.title   ?? title;
+      hint    = arg1.hint    ?? hint;
+      choices = arg1.choices ?? arg1.lines ?? [];
+      onPick  = arg1.onPick  ?? null;
+    }else{
+      choices = arg1;
+      onPick  = arg2;
+    }
+
+    const arr = Array.isArray(choices) ? choices : [choices];
+
+    prevTitle = titleEl.textContent;
+    prevHint  = hintEl.textContent;
+
+    titleEl.textContent = title;
+    hintEl.textContent  = String(hint||"");
+    choicesEl.innerHTML = "";
+
+    active = true;
+
+    arr.forEach((t, i)=>{
+      const b = document.createElement("button");
+      b.textContent = cleanPlayerChoiceLabel(t);
+      b.onclick = ()=>{
+        wrap.classList.remove("show");
+        const cb = onPick;
+        restore();
+        if(cb) cb(t, i);
+      };
+      choicesEl.appendChild(b);
+    });
+
+    wrap.classList.add("show");
+  }
+
+
+  return { open, restore };
+})();
+
+function parseChatSceneBodyLines(sceneHtml){
+  const tmp = document.createElement("div");
+  tmp.innerHTML = sceneHtml;
+
+  // 司令室会話集は .chatSceneBody のみを使う（タイトル/番号は捨てる）
+  const body = tmp.querySelector(".chatSceneBody") || tmp;
+
+  // innerText は「未接続DOM」だと改行が潰れることがあるので、HTMLから確実に改行を復元する
+  let rawHtml = (body.innerHTML || "");
+  rawHtml = rawHtml.replace(/\r/g, "");
+
+  // <br> を改行へ
+  rawHtml = rawHtml.replace(/<br\s*\/?>/gi, "\n");
+
+  // それ以外のタグは除去
+  let raw = rawHtml.replace(/<[^>]*>/g, "");
+
+  // 行分割＋掃除
+  let lines = raw.split("\n").map(s=>s.trim()).filter(Boolean);
+  lines = lines.filter(s=>!/^[-─]{3,}$/.test(s));  // 区切り線を落とす
+  lines = lines.filter(s=>!/^#{1,6}\s/.test(s)); // markdown見出し
+  lines = lines.filter(s=>!/^■/.test(s));
+  lines = lines.filter(s=>!/^次は/.test(s));
+  return lines;
+}
+
+function buildScriptedTurns(lines){
+  const turns = [];
+  let speaker = null;
+
+  for(let i=0;i<lines.length;i++){
+    const ln = lines[i];
+
+    // 単独スピーカー行（長文フォーマット）
+    if(ln === "提督" || ln === "時雨"){
+      speaker = ln;
+      continue;
+    }
+
+    // 先頭にスピーカーが付いてる短文フォーマット
+    if(ln.startsWith("提督「")){
+      turns.push({speaker:"提督", text: ln});
+      speaker = null;
+      continue;
+    }
+    if(ln.startsWith("時雨「")){
+      turns.push({speaker:"時雨", text: ln});
+      speaker = null;
+      continue;
+    }
+
+    // 引用符だけの行：直前スピーカーがあれば付与して出す
+    if(ln.startsWith("「") && speaker){
+      turns.push({speaker, text: speaker + ln});
+      continue;
+    }
+
+    // 地の文／擬音／括弧など
+    turns.push({speaker:null, text: ln});
+    speaker = null;
+  }
+
+  return turns;
+}
+
+function stripSpeakerPrefix(x){
+    if(!x) return "";
+    return String(x)
+      .replace(/^提督\s*/,"")
+      .replace(/^時雨\s*/,"")
+      .replace(/^「/,"「"); // keep quotes
+  }
+
+function runScriptedChatScene(npcId, sceneHtml, afterStep){
+  const lines = parseChatSceneBodyLines(sceneHtml);
+  const turns = buildScriptedTurns(lines);
+
+  let idx = 0;
+  let hasAnyDialogue = false;
+  let startHandled = false;
+
+  // 先頭の発話者を把握（地の文は無視）
+  let firstSpeaker = null;
+  let firstSpeakerIdx = -1;
+  for(let i=0;i<turns.length;i++){
+    if(turns[i].speaker === "時雨" || turns[i].speaker === "提督"){
+      firstSpeaker = turns[i].speaker;
+      firstSpeakerIdx = i;
+      break;
+    }
+  }
+
+  const step = ()=>{
+    if(idx >= turns.length){
+      afterStep && afterStep();
+      return;
+    }
+    const t = turns[idx];
+
+    // 開始時特別UI：時雨から始まる会話
+    if(!startHandled && firstSpeaker==="時雨" && idx===firstSpeakerIdx){
+      startHandled = true;
+
+      const shigureLine = t.text;
+      // 次の「提督」発言が続くなら、時雨の台詞をポップアップ上に出して、その下に返答（提督）を出す
+      const next = turns[idx+1];
+      if(next && next.speaker==="提督"){
+        playerLineUI.open({
+          title: "時雨",
+          hint: stripSpeakerPrefix(shigureLine),
+          choices: [next.text],
+          onPick: (picked)=>{
+            // ログには順番どおり出す
+            pushLog(shigureLine);
+            pushLog(picked);
+            hasAnyDialogue = true;
+            idx += 2;
+            step();
+          }
+        });
+        return;
+      }else{
+        // 提督が続かないなら普通にログへ
+        pushLog(shigureLine);
+        hasAnyDialogue = true;
+        idx += 1;
+        step();
+        return;
+      }
+    }
+
+    // 以降は通常進行
+    if(t.speaker === "提督"){
+      startHandled = true;
+      const hint = (!hasAnyDialogue && firstSpeaker==="提督" && idx===firstSpeakerIdx)
+        ? "なんて話しかけよう？"
+        : "発言して進める";
+
+      playerLineUI.open({
+        title: "提督",
+        hint,
+        choices: [t.text],
+        onPick: (picked)=>{
+          pushLog(picked);
+          hasAnyDialogue = true;
+          idx += 1;
+          step();
+        }
+      });
+      return;
+    }
+
+    // NPC発言／地の文はそのままログへ
+    if(t.speaker === "時雨") hasAnyDialogue = true;
+    pushLog(t.text);
+    idx += 1;
+    step();
+  };
+
+  step();
+}
+
+
 
 /* =========================================================
    09) 対象一覧生成（コマンド別）
@@ -1120,6 +1466,12 @@ const CmdTalk = {
 
     // まずNPCの台詞
     const npc = Dialogue.npcLine(id, ctx);
+
+    // chatScene（司令室会話集）は「提督の発言を押して進める」方式で再生する
+    if(npc && typeof npc === "string" && npc.includes('class="chatScene"')){
+      return runScriptedChatScene(id, npc, afterStep);
+    }
+
     if(npc) pushLog(`【${S.chars[id].name}】${npc}`);
 
     // 返答選択→続くなら即もう一往復
@@ -1447,6 +1799,279 @@ const Dialogue = (() => {
   ========================= */
   const ShigureDialogue = (() => {
 
+    // ---- HQ (司令室) scripted talk bank (basic / doubt / affection / ecchi) ----
+    const HQ_BANK = {
+      basic: [
+        `<div class="chatScene"><div class="chatSceneTitle">①（書類の山）</div><div class="chatSceneBody">提督「今日の書類、多くないか。」<br>時雨「多いね。」<br>提督「戦争終わったのに増えるんだな。」<br>時雨「終わったから増える。」<br>提督「復興ってやつ？」<br>時雨「それと、平和の手続き。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">②（印鑑と回覧）</div><div class="chatSceneBody">提督「判子、これでいい？」<br>時雨「日付が一日ずれてる。」<br>提督「マジか。」<br>時雨「直して。今なら紙一枚で済む。」<br>提督「時雨、細かいな。」<br>時雨「司令室は細かい場所だよ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">③（窓と海図）</div><div class="chatSceneBody">提督「海、穏やかだな。」<br>時雨「うん。」<br>提督「出たくなる。」<br>時雨「“出たくなる”の種類がある。」<br>提督「種類？」<br>時雨「哨戒の出たくなると、逃げたい出たくなる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">④（椅子を引く音）</div><div class="chatSceneBody">提督「腰が痛い。」<br>時雨「椅子の高さが合ってない。」<br>提督「合わせ方分からん。」<br>時雨「今、直す。」<br>提督「近い。」<br>時雨「動かないで。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑤（コーヒー）</div><div class="chatSceneBody">提督「コーヒー淹れた。」<br>時雨「砂糖、入れすぎ。」<br>提督「甘い方が落ち着く。」<br>時雨「落ち着きたい理由がある顔。」<br>提督「顔で分かるのかよ。」<br>時雨「司令室は顔がよく見える。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑥（海図に鉛筆）</div><div class="chatSceneBody">提督「この線、ここで合ってる？」<br>時雨「そこは浅い。」<br>提督「浅いか。」<br>時雨「“浅い”に引っかかる顔しないで。」<br>提督「してねぇよ。」<br>時雨「してる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑦（夕方、日が傾く）</div><div class="chatSceneBody">提督「夕方って眠くなるな。」<br>時雨「単純に疲れてる。」<br>提督「昼、何もしてないのに？」<br>時雨「何もしてない顔じゃない。」<br>提督「……見てた？」<br>時雨「見える範囲で。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑧（書類棚）</div><div class="chatSceneBody">提督「これ、どこに仕舞うんだっけ。」<br>時雨「書類棚の右、二段目。」<br>提督「よく覚えてるな。」<br>時雨「覚えてないと、司令室が崩れる。」<br>提督「俺が崩してるみたいに言うな。」<br>時雨「崩してる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑨（小声）</div><div class="chatSceneBody">提督「声、落とした方がいい？」<br>時雨「今はいい。」<br>提督「今は？」<br>時雨「誰も廊下を通ってないから。」<br>提督「……足音で分かるのか。」<br>時雨「板張りは嘘つかない。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑩（報告の読み上げ）</div><div class="chatSceneBody">提督「読み上げてくれ。」<br>時雨「自分で読める。」<br>提督「目が滑る。」<br>時雨「じゃあ要点だけ。」<br>提督「助かる。」<br>時雨「甘やかすと癖になるよ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑪（夜、灯り）</div><div class="chatSceneBody">提督「灯り、もう落とすか。」<br>時雨「まだ。」<br>提督「何で。」<br>時雨「君が“落とす前”の顔してるから。」<br>提督「面倒くさい顔ってこと？」<br>時雨「決めかねてる顔。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑫（呼ぶだけ）</div><div class="chatSceneBody">提督「時雨。」<br>時雨「なに。」<br>提督「いや、確認。」<br>時雨「何を。」<br>提督「……そこにいるのを。」<br>時雨「いるよ。」<br><br>---<br><br>## ■長文タイプ ×12（1〜2往復、しっかり長い）</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">①（昼下がり・業務ほぼ完了）</div><div class="chatSceneBody">提督<br>「今日の報告、もう全部上がってるのか。戦争が終わったら楽になると思ってたけど、結局やることは減らないな。哨戒はローテで回るし、補給も安定してるし、現場はむしろ整ってる。なのに、机の上だけが終わらない。書類に埋もれてると、俺って“司令官”じゃなくて“判子係”に見えてくるんだよ。」<br><br>時雨<br>「平和ってそういうものだよ。危機がある時は判断が主役で、平和な時は手続きが主役になる。提督がやってるのは、みんなが安心して勝手に動ける土台の整備だ。派手じゃないけど、誰かがやらないと崩れる。君が“判子係”に見えるなら、それは鎮守府がちゃんと平和に生きてる証拠だよ。」<br><br>---</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">②（窓を開ける・潮風）</div><div class="chatSceneBody">提督<br>「窓、開けると潮の匂いがするな。昔はこの匂いを嗅ぐと、戦場の緊張が戻ってきた。今は…妙に落ち着く。怖いくらい落ち着く。終わったはずなのに、体だけ昔の癖で構える瞬間があるんだよな。」<br><br>時雨<br>「癖は簡単に抜けない。僕らも同じだよ。少しの物音で振り向くし、暗い時間帯は無意識に角を見てしまう。でも、落ち着くならそれでいい。司令室は“構えなくていい場所”であってほしい。君がここで緩むのは、悪いことじゃない。」<br><br>---</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">③（海図と鉛筆・現実的な逃走欲）</div><div class="chatSceneBody">提督<br>「海図を眺めてるとさ、つい線を引きたくなる。ここからここへ、潮に乗って、夜のうちに…って。任務じゃなくて、ただの気分でな。俺も自分で分かってる。格好いい理由じゃない。島は静かで、娯楽もない。たまに、無性に“外”が欲しくなる。」<br><br>時雨<br>「欲しくなるのは分かる。外の灯りも、人の多さも、店の匂いも、この島にはない。でも提督、それを口にした時点で、君は司令室の空気を変える。ここは“軽口”が重くなる場所なんだ。言うなら、言い方を選んで。僕は止める側に回りたくない。」<br><br>---</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">④（書類棚・積み上げ）</div><div class="chatSceneBody">提督<br>「この棚、戦争中より分厚くなってないか。記録が積み上がるって、結局“生き残った”ってことなんだろうけどさ。増えれば増えるほど、終わった実感が遠のく。片付けても片付けても次が来る。」<br><br>時雨<br>「記録は鎮守府の背骨だよ。誰が何をして、どこで何があって、どう判断したか。戦争が終わったからこそ、残しておかないといけない。次の世代が同じ苦労をしないために。…それに、提督が“遠のく”って言うのは、多分、終わり方に納得してないからだ。」<br><br>---</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑤（机の角・現実的な孤独）</div><div class="chatSceneBody">提督<br>「司令室って、広いようで狭いよな。机の上だけが世界になる。誰かが入ってくれば役割が始まるし、誰も来なければ役割が終わる。ふとした瞬間に、俺って“ここでしか生きてない”みたいな気分になるんだ。」<br><br>時雨<br>「“ここでしか生きてない”って思う時は、君が外で欲しいものを我慢してる時だよ。息抜きが足りてない。だからって、飛び出すのは違う。提督の息抜きは、司令室の外に“少しずつ”作れる。いきなり全部取りに行くと、全部失う。」<br><br>---</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑥（時計の針・夜更かし）</div><div class="chatSceneBody">提督<br>「気づくと、時計の針が進んでる。何もしてないのに夜が終わってる。…いや、何もしてないわけじゃないか。考えてるだけで疲れてる時ってあるよな。」<br><br>時雨<br>「ある。考えるのは、消耗する。提督は“次に何が起きるか”を想像し続ける癖があるから、平和な夜でも休まらない。だから、せめてこの部屋では、考える量を減らして。僕が要点を拾う。君は決める時だけ強くなればいい。」<br><br>---</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑦（机の上の私物・ささやかな癖）</div><div class="chatSceneBody">提督<br>「机の端、散らかってきたな。ペン、メモ、空のカップ。戦争中はもっと綺麗だった気がする。今の方が気が抜けてるってことか。」<br><br>時雨<br>「気が抜けてるんじゃない。生活が戻ってる。綺麗すぎる机は、むしろ不自然だよ。君がここでちゃんと暮らしてる証拠。…ただ、書類の上にカップは置かないで。こぼしたら、僕が怒る。」<br><br>---</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑧（来客がない時間・気まずさ）</div><div class="chatSceneBody">提督<br>「誰も来ないと、妙に落ち着かないな。忙しい時は忙しいで文句言うのに、暇になると落ち着かない。面倒な性格してる。」<br><br>時雨<br>「面倒でもいい。提督はそうやって自分を動かしてきた。僕らもそれで助かった。…ただ、暇な時間を“悪”にしないで。暇は整ってる証拠。君が息を整える時間だよ。」<br><br>---</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑨（海図を丸める・現実的に止める）</div><div class="chatSceneBody">提督<br>「海図、見てただけだ。別に、何かするつもりじゃない。」<br><br>時雨<br>「“見てただけ”は言い訳にならないよ。司令室でそれをやると、君は自分で自分を煽る。欲しいものを描いて、届かないって焦って、余計に乱れる。…見たいなら見ていい。でも、描く線は“任務の線”だけにして。」<br><br>---</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑩（疲れた時の頼り方）</div><div class="chatSceneBody">提督<br>「今日は頭が回らん。報告を読んでも入ってこない。こういう時、誰かに丸投げしたくなる。」<br><br>時雨<br>「丸投げはだめ。でも、分けるのはいい。君が読むべき部分と、僕が要約できる部分は違う。提督は判断のために読む。全部の文章を読む必要はない。…ほら、ここ。結論はこの三行にまとまってる。」<br><br>---</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑪（少しだけ近い距離・抑えめ）</div><div class="chatSceneBody">提督<br>「時雨、近い。机、狭いからって言うには近い。」<br><br>時雨<br>「書類を見せるにはこの距離が必要だよ。…嫌なら、言って。」<br><br>提督<br>「嫌じゃない。…ただ、意識する。」<br><br>時雨<br>「意識しなくていい。司令室で崩れたら、面倒だから。」<br><br>---</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑫（終業前・一言の重さ）</div><div class="chatSceneBody">提督<br>「今日はもう終わりにするか。区切りをつけないと、ずるずる続く。」<br><br>時雨<br>「区切りをつけよう。灯りを落として、机の上を揃えて、明日の自分に仕事を渡す。提督が“終わり”を作ると、鎮守府全体が終われる。…君の区切りは、みんなの区切りでもあるから。」</div></div>`
+    ],
+      doubt: [
+        `<div class="chatScene"><div class="chatSceneTitle">①（短文）</div><div class="chatSceneBody">提督「俺がいなくなっても、回るんだろ。」<br>時雨「回る。」<br>提督「即答だな。」<br>時雨「仕組みは回る。でも、空気は変わる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">②（短文）</div><div class="chatSceneBody">提督「最近、見られてる気がする。」<br>時雨「見てるよ。」<br>提督「監視か。」<br>時雨「確認。」<br>提督「疑ってる？」<br>時雨「疑いたくないから確認する。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">③（長文）</div><div class="chatSceneBody">提督<br>「仮にだぞ。仮に俺がいなくなっても、数日は問題なく進む。ローテも補給も完璧だ。だからさ、俺一人くらい、少し外を見に行っても――」<br><br>時雨<br>「“いなくなっても回る”と“いなくなっていい”は違う。提督がいなくなっても鎮守府は機能する。でも、その前提で動いてはいない。君が戻る前提で、みんな動いてる。そこを崩すなら、僕は止める。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">④（短文）</div><div class="chatSceneBody">提督「外の空気、吸いたいだけだ。」<br>時雨「司令室の窓は開く。」<br>提督「そういう意味じゃない。」<br>時雨「分かってる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑤（長文）</div><div class="chatSceneBody">提督<br>「本土の灯りを思い出すだけで疑われるのか。考えるだけで罪か？」<br><br>時雨<br>「考えるのは自由だよ。でも司令室で口にする言葉は重い。提督の“外に行きたい”は、ただの愚痴じゃない。動きに直結する言葉だ。僕は艦だ。提督の感情より、鎮守府の安定を優先する。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑥（短文）</div><div class="chatSceneBody">提督「俺を信用してない？」<br>時雨「してる。」<br>提督「じゃあ放っとけ。」<br>時雨「信用してるから、放っておかない。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑦（短文）</div><div class="chatSceneBody">提督「たまたま海図見てただけだ。」<br>時雨「“たまたま”が続いてる。」<br>提督「偶然だ。」<br>時雨「偶然は三回まで。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑧（長文）</div><div class="chatSceneBody">提督<br>「この島は静かすぎる。戦争が終わって、敵もいなくて、やることは維持だけだ。だから少しくらい、刺激を求めても――」<br><br>時雨<br>「刺激の方向が問題だ。任務の刺激なら歓迎する。でも、提督の目は“娯楽”を向いてる。正直でいい。でも正直だからこそ、僕は止める。ここは遊び場じゃない。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑨（短文）</div><div class="chatSceneBody">提督「いなくなっても困らないなら、問題ないだろ。」<br>時雨「困る。」<br>提督「さっき回るって言った。」<br>時雨「回るけど、困る。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑩（長文）</div><div class="chatSceneBody">提督<br>「もし俺がいなくなっても、司令室は誰かが座る。椅子は空かない。そう考えると、少し楽になるんだ。」<br><br>時雨<br>「楽になってはいけない。提督が軽くなるほど、この椅子は重くなる。君がいなくなっても、鎮守府は回る。でも、提督の席は“代替”じゃない。逃げるための理屈に、それを使わないで。」</div></div>`
+    ],
+      affection: [
+        `<div class="chatScene"><div class="chatSceneTitle">①（短文）</div><div class="chatSceneBody">提督「隣、座れ。」<br>時雨「命令？」<br>提督「お願い。」<br>時雨「……それなら、聞く。」<br>提督「近いな。」<br>時雨「今さらだよ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">②（長文）</div><div class="chatSceneBody">提督<br>「正直に言うとさ、司令室に時雨がいるだけで、空気が変わる。紙の匂いも、窓の光も、同じはずなのに、妙に落ち着く。戦争中は“頼れる部下”だったけど、今は……それだけじゃない気がする。」<br><br>時雨<br>「それだけじゃないよ。僕も変わった。戦うためだけにここにいるわけじゃない。提督が迷った時に横に立つのも、僕の役目だと思ってる。君が一人で抱え込まないように。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">③（短文）</div><div class="chatSceneBody">提督「今日、疲れた。」<br>時雨「顔に出てる。」<br>提督「そんなに？」<br>時雨「僕には分かる。」<br>提督「隠してたのに。」<br>時雨「隠せてない。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">④（長文）</div><div class="chatSceneBody">提督<br>「いなくなっても回る、って言ったよな。でもさ、いなくなっても回るからこそ、俺はここに“残る”ことを選んでる。勝手にいなくなるより、ちゃんと居続ける方が難しいんだ。」<br><br>時雨<br>「うん。だから僕は、提督が“残る”と決めてるのを知ってる。疑ってるわけじゃない。…ただ、たまに揺れるのも知ってる。揺れてもいい。でも最後は、ここに戻る人だって分かってる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑤（短文）</div><div class="chatSceneBody">提督「手、当たってる。」<br>時雨「分かってる。」<br>提督「どけないのか。」<br>時雨「嫌じゃないから。」<br>提督「……俺も。」<br>時雨「うん。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑥（長文）</div><div class="chatSceneBody">提督<br>「時雨はさ、俺が弱いところ見せても平気か？」<br><br>時雨<br>「平気。提督は強い人だけど、強いだけの人じゃない。弱い瞬間も含めて“提督”だよ。僕が守るのは命令だけじゃない。君の体裁も、迷いも、全部ひっくるめてだ。」<br><br>提督<br>「そこまで言うか。」<br><br>時雨<br>「言うよ。今は。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑦（短文）</div><div class="chatSceneBody">提督「司令室、二人きりだな。」<br>時雨「そうだね。」<br>提督「静かだ。」<br>時雨「静かだから、近い。」<br>提督「近い？」<br>時雨「距離が。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑧（長文）</div><div class="chatSceneBody">提督<br>「昔はさ、司令室って緊張する場所だった。作戦と責任と決断の部屋。でも今は、少し違う。ここで時雨と並んで座ってると、“日常”の部屋に見える。」<br><br>時雨<br>「日常に戻れたなら、それは提督の功績だよ。戦争の司令室から、暮らしの司令室へ。…僕はその変化を一番近くで見てきた。だから、隣にいるのは自然なんだ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑨（短文）</div><div class="chatSceneBody">提督「俺がいなくなっても困るか？」<br>時雨「困る。」<br>提督「回るのに？」<br>時雨「回るけど、困る。」<br>提督「どう違う。」<br>時雨「心の問題。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑩（長文）</div><div class="chatSceneBody">提督<br>「時雨、ここにいる理由って何だと思う。任務でも命令でもなくて、今こうして隣にいる理由。」<br><br>時雨<br>「提督がいるから。任務がなくても、命令がなくても、僕はここを選ぶ。司令室は責任の場所だけど、同時に“帰る場所”でもある。君がいる限り、僕はここにいる。」</div></div>`
+    ],
+      ecchi: [
+        `<div class="chatScene"><div class="chatSceneTitle">①【机の下・書類拾い】</div><div class="chatSceneBody">（司令室。提督が机の下に落ちた書類を拾おうと屈む）<br><br>提督<br>「っと……落としたな。」<br><br>（同時に、時雨も反対側から屈む）<br><br>ごつっ<br><br>提督<br>「わっ、悪――」<br><br>（反射的に手を伸ばし、柔らかい感触）<br><br>むにっ……<br><br>時雨<br>「……っ！？」<br>「て、提督……！ そ、そこ……！」<br><br>提督<br>「え、あ、ちが――！」<br><br>時雨<br>「ぼ、僕の……胸……！」<br><br>（慌てて後ずさり、顔が赤くなる）<br><br>時雨<br>「司令室で……な、何してるんだ……もう……！」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">②【椅子・距離感ミス】</div><div class="chatSceneBody">（司令室。並んで報告書を確認中。椅子の距離が近い）<br><br>提督<br>「この数字、前月比で――」<br><br>（体を傾けた拍子に、肘が当たる）<br><br>むにゅ…<br><br>提督<br>「……？」<br><br>時雨<br>「……っ！？」<br><br>提督<br>「え、今の――」<br><br>時雨<br>「ひ、肘……当たってる……！」<br><br>（慌てて身を引く）<br><br>時雨<br>「ち、近すぎる……司令室は業務の場だよ……！」<br><br>（と言いつつ、耳まで赤い）</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">③【司令室・机の下／四つん這い】</div><div class="chatSceneBody">（司令室。机の奥に落ちたファイルを取ろうとして、時雨が机の下に四つん這いで潜り込む）<br><br>時雨<br>「……奥に引っかかってる……」<br><br>（スカートが持ち上がり、太ももと下着がわずかに見える）<br><br>提督<br>「……。」<br><br>（思わずしゃがみ込み、覗き込む）<br><br>時雨<br>「……提督？」<br><br>提督<br>「いや、その……手伝おうと――」<br><br>（視線は完全に下）<br><br>時雨<br>「……どこ、見てるの。」<br><br>（ゆっくり振り向く）<br><br>時雨<br>「……今、スカートの中……見たよね。」<br><br>提督<br>「……。」<br><br>時雨<br>「……見たなら、ちゃんと目を逸らす。<br>逸らさないなら……覚悟する。」<br><br>（顔は赤いが、逃げない）<br><br>（……黒だった。）</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">④【司令室・書類棚の上段／尻もち・パンツ越し＋心理】</div><div class="chatSceneBody">（司令室。時雨が書類棚の上段の本を取ろうとして、椅子に乗る）<br><br>時雨<br>「……あと少し……」<br><br>（背伸びした瞬間、椅子がきしむ）<br><br>ガタンッ<br><br>提督<br>「危な――」<br><br>（支えようと前に出た拍子に、時雨がバランスを崩す）<br><br>どさっ<br><br>（スカートがふわっと落ち、提督の頭がその中に収まる。<br>顔いっぱいに、パンツ越しの柔らかさが押し当てられる）<br><br>むにゅっ<br><br>（やわらか……。布越しに伝わる体温。<br>洗い立ての布の匂いに、かすかに甘い香りが混じる）<br><br>提督<br>「――っ！？」<br><br>時雨<br>「……っ！？ え……！？」<br><br>（慌てて身を起こす）<br><br>時雨<br>「ご、ごめん……提督……！<br>だ、大丈夫……！？ ほんとに……！」<br><br>（顔を真っ赤にして、スカートを押さえる）<br><br>時雨<br>「……高い所、無理しちゃ……だめだね……」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑤【司令室・床の海図／距離ミス】</div><div class="chatSceneBody">（床に大きな海図を広げ、二人で確認）<br><br>提督<br>「この流れ, ここで変わる――」<br><br>（時雨が指し示そうとして前に出すぎる）<br><br>こつっ<br><br>（額同士が軽く当たる）<br><br>時雨<br>「……っ！？」<br><br>提督<br>「悪い。」<br><br>（距離が近すぎて、一瞬止まる）<br><br>時雨<br>「……床で見ると、距離感……狂うね。」<br><br>（小さく咳払いして、少し離れる）</div></div>`,
+        `<div class="chatScene"><div class="chatSceneTitle">⑥【司令室・夜／背後通過・擦れ】</div><div class="chatSceneBody">（夜の司令室。机と書類棚の間は人一人分の幅しかない）<br><br>提督<br>「後ろ、通る。」<br><br>時雨<br>「……うん。」<br><br>（互いに体を横に向けた瞬間、距離が読みきれない）<br><br>すり……<br><br>（提督の下腹部が、スカート越しの尻に触れる）<br><br>時雨<br>「……っ。」<br><br>提督<br>「悪い、狭――」<br><br>（もう一歩踏み出した拍子に、今度はゆっくり、押し付ける形で擦れる）<br><br>すり……す……<br><br>（柔らかい弾力。丸みがわずかに沈み、すぐ戻る。<br>ほんの一瞬、その感触を意識してしまう）<br><br>時雨<br>「……今の。」<br><br>提督<br>「……。」<br><br>（視線を逸らし、半歩だけ前に出る）<br><br>時雨<br>「……次は、距離……気をつけて。」<br><br>（……時雨の尻、一瞬だったけど気持ちよかった。……くそ、本当だったら思いっきり……）</div></div>`
+    ],
+    };
+
+    // ---- Other locations scripted talk bank (basic / doubt / affection / ecchi) ----
+    const LOC_BANK = {
+      "radio_room": {
+        basic: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「静かだな。何か入ってる？」<br>時雨「入ってない。砂嵐も薄い。」<br>提督「平和だと無線も暇だ。」<br>時雨「暇でも、耳は休ませない。」<br>提督「神経すり減らすぞ。」<br>時雨「提督が“急に黙る”方が怖い。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「今日も定型文だけか。」<br>時雨「それでいい。定型は安定の印。」<br>提督「たまには雑談が欲しい。」<br>時雨「雑談が欲しいなら、僕に話して。」<br>提督「無線相手に言うのも変だろ。」<br>時雨「司令室じゃない。ここなら、少しは軽くてもいい。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「音、ちょっと大きい？」<br>時雨「少し。耳が疲れる。」<br>提督「下げるか。」<br>時雨「下げすぎると拾えない。」<br>提督「じゃあ、ここ。」<br>時雨「うん、そのくらい。…提督、意外と手つきが丁寧だね。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「戦争が終わって、無線が“待つだけ”になったな。昔はこのノイズ一つで息が止まった。今は、逆に静かすぎて落ち着かない。何か起きないと安心できないって、変な癖が残ってる。」<br>時雨「変じゃない。癖は生き延びるために身についた。落ち着かない夜は、無線の前に座ればいい。ノイズがある限り、僕らは“見張ってる”って実感できる。実感は、心を繋ぎ止めるから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「通信記録って、読み返すと面白いな。最前線の切羽詰まった文面も、今となっては紙の上だ。笑えるわけじゃないけど…どこか遠い。」<br>時雨「遠く感じるのは、今が違うからだよ。遠いなら、いいことだ。…ただ、忘れていいって意味じゃない。記録は“繰り返さない”ためにある。提督が残してくれたから、僕らは次を選べる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「眠くなってきた。交代するか。」<br>時雨「まだ大丈夫。僕が残る。」<br>提督「無理すんな。眠いと判断鈍る。」<br>時雨「眠い時は、手順に戻る。勝手に判断しない。…提督が先に休めば、僕も安心して手順を守れる。」<br>---</div></div>`
+        ],
+        doubt: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「…さっきから、俺の手元見てないか。」<br>時雨「見てる。」<br>提督「無線の確認？」<br>時雨「君の確認。」<br>提督「監視かよ。」<br>時雨「監視じゃない。今日は手順が雑いから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「今日も定型文だけか。」<br>時雨「それでいい。」<br>提督「…本土、今夜は賑やかなんだろうな。」<br>時雨「そういう話、ここで増やさないで。」<br>提督「なんで。」<br>時雨「君が“行く理由”を増やすから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「これで記録、付けといた。」<br>時雨「時刻が抜けてる。」<br>提督「いいだろ、そのくらい。」<br>時雨「よくない。抜けは都合のいい隠し方になる。」<br>提督「…刺さる言い方するな。」<br>時雨「刺さらないと直らない。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「交代しよう。俺が残る。時雨は先に寝ろ。」<br>時雨「僕が残る。今日は交代しない。」<br>提督「疑ってるのか？」<br>時雨「疑いじゃない。最近、君が“夜の時間”を欲しがってる。無線室に残れば、誰にも見られないから。」<br>提督「…言い方。」<br>時雨「見えない場所ほど、ズレが出る。だから、今夜は僕がここにいる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「この周波数、念のため回してみただけだ。」<br>時雨「“念のため”が多い。目的が曖昧な操作は残す。」<br>提督「残すって？」<br>時雨「記録に。何時に、どの帯域を回したか。後で説明できるように。やましいって意味じゃない。やましいって言われないため。」<br>提督「…窮屈だな。」<br>時雨「窮屈にしてるのは僕じゃない。君の動きだよ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「誰も来ないだろ。声、落とす必要あるか？」<br>時雨「ある。廊下の板、足音が響く。」<br>提督「…神経質。」<br>時雨「神経質でいい。君が“こそこそ”に慣れると、次は“外で”になる。」<br>提督「飛躍してないか。」<br>時雨「飛躍じゃない。過去の癖を見てる。」<br>---</div></div>`
+        ],
+        affection: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「手、冷えてるな。」<br>時雨「夜は冷える。」<br>提督「カップ持て。温かい。」<br>時雨「…ありがとう。」<br>提督「今さら照れるなよ。」<br>時雨「照れてない。…少し嬉しいだけ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「何も来ないな。」<br>時雨「平和だね。」<br>提督「眠くなる。」<br>時雨「寝ないで。」<br>提督「時雨がいると安心してくる。」<br>時雨「安心して。僕が聞いてる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「これ、ちょい下げるぞ。」<br>時雨「うん、ちょうどいい。」<br>提督「耳、大丈夫か？」<br>時雨「提督の声は聞こえる。」<br>提督「業務の話だよな？」<br>時雨「…今は両方。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「交代しよう。俺が残る。時雨は先に休め。…最近、無理してるの分かる。真面目にやりすぎだ。」<br>時雨「無理はしてない。提督が“平気なふり”をする時、僕がここにいたいだけ。…それに、君が先に休むと、僕も安心する。寝る順番って、意外と大事だよ。」<br>提督「面倒な気遣いだな。」<br>時雨「面倒でいい。君が崩れないなら。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「記録、書いといた。字、汚くて悪い。」<br>時雨「読める。大丈夫。」<br>提督「時雨の字、綺麗だな。整ってる。」<br>時雨「整えるのが癖なだけ。」<br>提督「癖でも助かる。…こういうの、二人で残していく感じ、悪くないな。」<br>時雨「うん。僕も悪くないと思う。司令室じゃなくても、君の隣で“残す”のは落ち着く。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「昔はノイズが怖かった。今は、ノイズがあると落ち着く。変な話だよな。」<br>時雨「変じゃない。怖かった場所が、今は“戻る場所”になっただけ。…提督、ここで落ち着けるなら、それでいい。僕は、君が落ち着く場所を増やしたい。」<br>提督「増やしたいって、どうやって。」<br>時雨「一緒に座る。必要なら、それだけで。」<br>---</div></div>`
+        ],
+        ecchi: [
+        `<div class="chatScene"><div class="chatSceneBody">（無線室。深夜。受信待ちのノイズが細く鳴り、手元灯だけが机を照らす）<br>提督「……また定型か。眠くなる。」<br>時雨「起きて。記録、抜ける。」<br>提督「分かってるって。」<br>（提督がペンを落とし、机の下へ手を伸ばす。同時に時雨が背後から覗き込む）<br>すっ…<br>提督「うわ、近い。」<br>時雨「落としたの、これ？」<br>（時雨の胸元が提督の肩に押し当てられ、提督が息を呑む）<br>ぴた…<br>提督「……時雨、ちょ、当たってる。」<br>時雨「当ててない。……結果的に当たってるだけ。」<br>提督「結果が問題だろ。」<br>時雨「じゃあ、拾って。早く。」<br>提督「……急かすな。」<br>時雨「急かす。僕も…落ち着かないから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（提督が片耳イヤホンで雑音を拾う。時雨が椅子を引き寄せ、同じ距離に座る）<br>提督「席、近くないか。」<br>時雨「近い方が聞き分けられる。」<br>提督「音の話だよな。」<br>時雨「音の話。」<br>（時雨が片耳を寄せ、提督の肩に指先を置く）<br>とん…<br>提督「……肩、押さえるな。」<br>時雨「揺れないように。」<br>提督「心が揺れる。」<br>時雨「静かに。今、波形が変わった。」<br>提督「……それも、俺のせい？」<br>時雨「君のせい。…でも、嫌じゃない。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（周波数表を二人で広げ、同じ欄を同時に指す）<br>提督「ここだろ。」<br>時雨「違う。こっち。」<br>（指が重なる）<br>ぴと…<br>提督「またか。」<br>時雨「まただね。」<br>提督「離せ。」<br>時雨「離す。…でも、ずるい。」<br>提督「何が。」<br>時雨「触れた瞬間に、君が黙るの。」<br>提督「黙ってねぇ。」<br>時雨「黙ってる。…目だけ動いてる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（提督がマイクを握り、時雨がゲインを調整する。試験音が短く鳴る）<br>ピッ…<br>提督「入ってるか？」<br>時雨「もう少し、声を近く。」<br>提督「近く？」<br>時雨「小さい声でいい。僕だけに聞こえるくらい。」<br>提督「……何の試験だよ。」<br>時雨「無線の試験。」<br>提督「それなら普通に――」<br>時雨「普通じゃない声、出して。」<br>提督「……時雨、悪い顔してる。」<br>時雨「見ないで。…聞いて。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（提督が書き損じ、紙を丸めようとする）<br>提督「やり直しだ。捨て――」<br>時雨「捨てない。」<br>（時雨が提督の手首を掴んで止める）<br>ぎゅ…<br>提督「強いな。」<br>時雨「癖になる前に止める。」<br>提督「何が癖だよ。」<br>時雨「雑に扱う癖。…君自身も。」<br>提督「……。」<br>時雨「今、黙った。」<br>提督「黙るしかない言い方するな。」<br>時雨「黙る顔、嫌いじゃない。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（交代の時間。時雨が提督の背後から上着を肩に掛け、襟を整える）<br>ふわ…<br>提督「……急に優しいな。」<br>時雨「冷えてる。」<br>（襟元を直す指が首筋に触れ、提督が肩をすくめる）<br>すっ…<br>提督「そこ、弱い。」<br>時雨「言うの、ずるい。」<br>提督「ずるくねぇ。」<br>時雨「ずるい。…じゃあ、黙って。」<br>提督「……。」<br>時雨「黙った。…いい子。」<br>────────────────────────</div></div>`
+        ],
+      },
+      "workshop": {
+        basic: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「ここ、匂いが違うな。」<br>時雨「油と金属。工廠の匂い。」<br>提督「落ち着く？」<br>時雨「落ち着く。手を動かす場所だから。」<br>提督「戦争終わっても整備は続くな。」<br>時雨「続く。続けるから、壊れない。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「この部品、どれが新品だ？」<br>時雨「箱の角が揃ってるのが新品。」<br>提督「見ただけで分かるのか。」<br>時雨「触るともっと分かる。」<br>提督「触っていい？」<br>時雨「いいけど、落とさないで。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「塗り直し、必要か？」<br>時雨「必要。塩で劣化する。」<br>提督「見た目だけの問題じゃないんだな。」<br>時雨「見た目は最後。まず中身。」<br>提督「時雨らしい。」<br>時雨「提督が褒めたのなら、ちゃんとやる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「ローテが安定してるなら、整備ももっと気楽に回ると思ってた。でも、予防整備って終わりがないな。やればやるほど“次”が見える。」<br>時雨「予防は“何も起きない”を作る仕事だよ。成果が見えにくいけど、壊れてから直すよりずっと強い。…提督が退屈に感じるなら、平和がちゃんと機能してるってこと。僕は、その退屈を守りたい。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「この工具箱、戦争中から変わってない。手に馴染みすぎて、逆に怖い時がある。いざって時の動きが勝手に出る。」<br>時雨「勝手に出る動きがあるのは強みだよ。必要な時に迷わない。でも、今は“必要な時”が来ないように整備する。…提督が怖いなら、工廠では“今のための手”を覚え直そう。ゆっくりでいい。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「地味な作業ばっかだな。」<br>時雨「地味でも、終わらせると気持ちいい。」<br>提督「分かる気もする。」<br>時雨「じゃあ一緒にやろう。ボルト一本締めるだけでもいい。提督が手を出すと、工廠が“ただの場所”じゃなくなる。ここも鎮守府の暮らしになる。」<br>---</div></div>`
+        ],
+        doubt: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「このレンチ、借りるぞ。」<br>時雨「どこに使うの。」<br>提督「ちょっと外の扉が…」<br>時雨「“扉”って言った。どの扉？」<br>提督「倉庫の。」<br>時雨「用途と返却時間、言って。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「部品、これ足りてる？」<br>時雨「数が一つ合ってない。」<br>提督「どっかで使ったんじゃね？」<br>時雨「“どっか”はだめ。記録がないと、盗難と同じ扱いになる。」<br>提督「俺が盗むかよ。」<br>時雨「疑われる形を作らないで。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「…この塗料、まだ使える？」<br>時雨「使える。」<br>提督「じゃあいい。」<br>時雨「“じゃあいい”の前に何を考えたの。」<br>提督「別に。」<br>時雨「別にじゃない。顔に出てる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「整備記録、まとめて後で書く。今は手が汚れてる。」<br>時雨「後回しは、抜けが出る。抜けは都合のいい言い訳に変わる。」<br>提督「そんな深読みするな。」<br>時雨「深読みしなくても、現場はそうなる。だから“今ここで一行”だけ書いて。部位、作業、時刻。手が汚れてても書ける。」<br>提督「…分かったよ。」<br>時雨「それでいい。君が自分を守るために。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「この蝶番、油差しとく。きしむの嫌だろ。」<br>時雨「油はいい。でも、工廠の油を“外扉”に使うのは珍しい。」<br>提督「珍しいだけだ。」<br>時雨「珍しいなら理由がいる。…提督、僕は整備の話をしてる。逃げる話じゃない。だから答えて。どの扉を、どう直す？」<br>提督「…倉庫の通用口。最近重い。」<br>時雨「なら僕も確認する。一人で触らないで。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「一人でやった方が早い作業もある。」<br>時雨「工廠で“ひとり”は許す。でも“工廠の外に繋がる作業”は許さない。」<br>提督「線引きが厳しいな。」<br>時雨「厳しくしないと、工廠が“準備室”になる。ここは整備の場所。脱走の準備場所じゃない。」<br>---</div></div>`
+        ],
+        affection: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「このネジ、固いな。」<br>時雨「貸して。」<br>提督「頼む。」<br>時雨「…ほら、回った。」<br>提督「助かる。」<br>時雨「助けるの、好きなんだ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「上の箱、取ってくれ。」<br>時雨「うん。…提督、下、支えて。」<br>提督「こう？」<br>時雨「そう。落ちたら危ないから。」<br>提督「時雨が危ないって言うと従うしかない。」<br>時雨「従って。僕が安心する。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「工廠って匂い強いな。」<br>時雨「慣れると落ち着くよ。」<br>提督「落ち着くのか。」<br>時雨「手を動かせるから。提督も、顔が少し柔らかい。」<br>提督「見てんのかよ。」<br>時雨「見てる。良い顔だから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「戦争が終わっても整備は終わらないな。地味だし、量も多い。でも、工廠にいると頭が軽くなる。考え事が減る。」<br>時雨「手を動かすと、余計な想像が止まる。提督は考えすぎる時があるから、工廠の時間は合ってる。…僕も、君がここで少し楽そうにしてるのを見ると安心する。」<br>提督「時雨は俺の顔ばっか見てるな。」<br>時雨「必要な確認だよ。今は、“大丈夫そう”って分かる確認。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「もう今日は切り上げるか。やりすぎると雑になる。」<br>時雨「うん。区切りを作るのは大事。…提督が“やめる”って言えるようになったの、前より良い。」<br>提督「前は止まれなかったか。」<br>時雨「止まれなかった。責任で押し切ってた。でも今は、鎮守府が落ち着いてる。だから、提督が自分に優しくできる。」<br>提督「時雨が言うなら、そうする。」<br>時雨「僕が言うから、そうして。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「うわ、手に油ついた。」<br>時雨「拭いて。ほら、布。」<br>提督「時雨、用意良すぎ。」<br>時雨「提督が汚すの、分かってた。」<br>提督「ひでぇ言い方。」<br>時雨「ひどくない。…こういう小さい失敗、今は笑える。昔は笑えなかったから。」<br>提督「確かにな。」<br>時雨「笑えるのが、嬉しい。」<br>---</div></div>`
+        ],
+        ecchi: [
+        `<div class="chatScene"><div class="chatSceneBody">（騒音の中。提督が小さな部品を押さえきれず、時雨が手を重ねて固定する）<br>ぱし…<br>提督「お、おい、手――」<br>時雨「動くと危ない。」<br>（時雨の指が提督の指の上でしっかり押さえ込む）<br>ぐっ…<br>提督「……押さえ方が妙に丁寧だな。」<br>時雨「雑だとズレる。」<br>提督「……ズレてほしいって言ったら？」<br>時雨「言わないで。…僕の集中、崩れる。」<br>提督「崩したくなる。」<br>時雨「崩さないで。…終わったら、好きにして。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（工具箱を覗き込む二人。探している間、距離が詰まり続ける）<br>提督「どれだ…」<br>時雨「これ。…違う、こっち。」<br>（頬が軽く触れる）<br>こつ…<br>提督「悪い。」<br>時雨「ううん。…もう一回。」<br>提督「は？」<br>時雨「冗談。…でも、冗談にしたくない顔だね。」<br>提督「してない。」<br>時雨「してる。…目が逃げてる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（提督の袖に油。時雨が布で拭く）<br>さわ…さわ…<br>提督「もういいって。」<br>時雨「まだ。」<br>提督「残ってないだろ。」<br>時雨「残ってる。…僕の気分が。」<br>提督「気分？」<br>時雨「汚れてるの、嫌。…君が、雑に扱われるのも嫌。」<br>提督「……なんだそれ。」<br>時雨「言わせないで。…動かないで、もう少し。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（騒音で聞こえず、時雨が提督の耳元へ）<br>時雨「ここ、押さえて。」<br>提督「ん？」<br>（耳に息が触れる）<br>ふ…<br>提督「……別のとこがうるさい。」<br>時雨「別のってなに。」<br>提督「時雨の声。」<br>時雨「……褒め方が下手。」<br>提督「下手でも本音だ。」<br>時雨「じゃあ…もう一回言って。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（棚の間。人一人分。互いに体を横にして通ろうとする）<br>提督「通る。」<br>時雨「うん。」<br>（背中が擦れる）<br>すり…<br>提督「……狭い。」<br>時雨「狭いね。」<br>提督「避けろよ。」<br>時雨「避けてる。…これ以上は無理。」<br>提督「……無理って顔じゃない。」<br>時雨「無理。…でも、嫌じゃないだけ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（提督の軍手が破れ、指先が出ている。時雨が替えを差し出す）<br>時雨「替えて。」<br>提督「後で。」<br>時雨「今。」<br>（時雨が提督の手を取って軍手を外す）<br>きゅ…<br>提督「……握るな。」<br>時雨「逃がさない。」<br>提督「命令か？」<br>時雨「お願い。…でも、断るなら命令にする。」<br>提督「脅すな。」<br>時雨「脅してない。守ってる。」<br>────────────────────────</div></div>`
+        ],
+      },
+      "storage": {
+        basic: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「資材、減ってないか？」<br>時雨「減ってる。使ってるから。」<br>提督「不安になる減り方だ。」<br>時雨「数字を見て。不安は数字で切る。」<br>提督「冷静だな。」<br>時雨「資材庫は冷静でないと崩れる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「これ、上に積んでいい？」<br>時雨「だめ。重いのは下。」<br>提督「了解。」<br>時雨「角を揃えて。」<br>提督「几帳面だな。」<br>時雨「崩れると危ない。提督も危ない。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「帳簿、字が小さいな。」<br>時雨「読みやすく書くと、改ざんしやすい。」<br>提督「そこまで考えるのか。」<br>時雨「平和ほど、油断で汚れる。」<br>提督「耳が痛い。」<br>時雨「痛いなら、直せる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「戦争が終わっても、資材が減ると身構えるな。足りないって感覚が、体に残ってる。必要な時に無いのが一番怖い。」<br>時雨「怖いなら、定数を決めよう。最低ラインを越えたら補充。越えてる間は心配しない。心配を“手順”に落とす。…提督が落ち着くなら、僕は帳簿をもっと見やすく整える。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「余裕って、どう作るんだろうな。」<br>時雨「余裕は“余り”じゃない。先に確保するもの。」<br>提督「確保しても使えば減る。」<br>時雨「減る前提で回す。減ったら戻す。繰り返す。資材庫はそのためにある。提督が考えることは、余裕を守る仕組み。僕は、その仕組みが回ってるかを見る。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「ここ、やけに静かだな。」<br>時雨「音が吸われる。木箱と布。」<br>提督「落ち着くな。」<br>時雨「落ち着くけど、長居はだめ。油断する。」<br>提督「真面目だな。」<br>時雨「真面目じゃないと、守れないものがあるから。」<br>---</div></div>`
+        ],
+        doubt: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「鍵、借りるぞ。」<br>時雨「何を出すの。」<br>提督「酒…じゃなくて、油布。」<br>時雨「今、言い直した。」<br>提督「気のせいだ。」<br>時雨「気のせいじゃない。台帳に書いてから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「縄、こんなにいらんだろ？」<br>時雨「いる。梱包に使う。」<br>提督「梱包ねぇ。」<br>時雨「“荷物を作る”発想が先に出るのが嫌。」<br>提督「ただの雑談だ。」<br>時雨「雑談で準備する人がいる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「乾パン、まだ余ってる？」<br>時雨「ある。期限も問題ない。」<br>提督「備えすぎじゃね？」<br>時雨「備えは減らさない。減らすのは、使った時だけ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「細かい物くらい、いちいち書かなくていいだろ。」<br>時雨「細かい物ほど消える。消えると、疑いが残る。疑いは人を傷つける。」<br>提督「俺が傷つく側ってことか。」<br>時雨「そう。だから書く。君が“勝手に持ち出した”って言われないために。面倒でも、守りになる。」<br>提督「…分かった。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「ここ、配置変えた？」<br>時雨「変えた。危ない物を奥にした。」<br>提督「なんで俺に言わない。」<br>時雨「言った。聞いてなかった。」<br>提督「…覚えてない。」<br>時雨「覚えてないのが問題。資材庫で“覚えてない”は事故の入口。今から位置を覚えて。僕が言うから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「数えるの、そこまで必要か？」<br>時雨「必要。今日、君が“急いでる”から。」<br>提督「急いでない。」<br>時雨「急いでる。手が速い。目が泳ぐ。そういう時に数が狂う。狂うと、後で説明がいる。」<br>提督「…説明が面倒って言いたいのか。」<br>時雨「面倒を避けるために、今数える。」<br>---</div></div>`
+        ],
+        affection: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「ここ、まだ余裕ある？」<br>時雨「ある。今月は安定してる。」<br>提督「時雨の管理、助かる。」<br>時雨「提督が見てくれるから回る。」<br>提督「俺、見てないぞ？」<br>時雨「見てる。僕のやってることを、否定しないでくれる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「これ、運ぶか。」<br>時雨「二人で運ぼう。重い。」<br>提督「俺が持つ。」<br>時雨「半分。君が無理すると、後で疲れる。」<br>提督「時雨、厳しいな。」<br>時雨「優しいつもり。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「帳簿、見やすいな。」<br>時雨「整えた。」<br>提督「几帳面って得だな。」<br>時雨「得じゃない。…君が迷わないようにしたいだけ。」<br>提督「迷わないように、か。」<br>時雨「うん。司令室でも、ここでも。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「資材が揃ってると、それだけで気が楽になるな。何かあっても、すぐ動けるって思える。」<br>時雨「備えがあると心が落ち着く。戦争中に足りない経験をしたから、余計にね。…提督が楽になるなら、僕は数字を整える。数字が整うと、君の顔も整う。」<br>提督「顔って。」<br>時雨「顔。疲れてる時と、安心してる時、違う。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「ここ、暗いな。灯り増やすか。」<br>時雨「今のままでも歩ける。…でも、君が不安なら増やす。」<br>提督「不安ってほどじゃない。」<br>時雨「じゃあ、僕が横にいる。暗い場所は声が近いから、落ち着くでしょ。」<br>提督「…時雨、近いな。」<br>時雨「資材庫は狭い。言い訳が立つ。」<br>提督「言い訳？」<br>時雨「近くにいる言い訳。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「補充、意外と時間かかるな。」<br>時雨「一つずつ揃えるから。雑にやると後で困る。」<br>提督「でも、二人でやると早い。」<br>時雨「うん。提督がいると、作業が作業だけじゃなくなる。…終わった後に、ちゃんと“終わった”って感じがする。」<br>提督「言い方可愛いな。」<br>時雨「言い方じゃない。実感。」<br>---</div></div>`
+        ],
+        ecchi: [
+        `<div class="chatScene"><div class="chatSceneBody">（時雨が棚から箱を下ろす。提督が受け取るが、重みで二人の距離が詰まる）<br>どん…<br>提督「重っ…」<br>時雨「落とさないで。」<br>提督「落とさねぇよ。」<br>（箱を挟んで顔が近い）<br>時雨「……近い。」<br>提督「箱のせいだ。」<br>時雨「箱のせいにするの、ずるい。」<br>提督「ずるくねぇ。」<br>時雨「ずるい。…君、わざと息、整えてる。」<br>提督「……。」<br>時雨「黙った。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（資材庫の奥。灯りが弱い。足元が見えづらい）<br>提督「暗いな。」<br>時雨「こっち。」<br>（時雨が手首を掴んで引く）<br>ぎゅ…<br>提督「掴むな。」<br>時雨「転ばれるよりいい。」<br>提督「……掴み方が、妙に確信ある。」<br>時雨「確信ある。君はここでつまずく。」<br>提督「予言かよ。」<br>時雨「予測。…外したら離す。」<br>提督「外すなよ。」<br>時雨「外さない。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（時雨が帳簿に書き込み。提督が肩越しに覗く）<br>提督「字、綺麗。」<br>時雨「見ないで。」<br>提督「なんで。」<br>時雨「近い。」<br>提督「近いだけで？」<br>時雨「近いだけで、落ち着かない。」<br>提督「俺が？」<br>時雨「君が。…君のせい。」<br>提督「……言い切るな。」<br>時雨「言い切る。逃げないで。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（時雨が奥の小箱に手を伸ばし、体勢が崩れそうになる）<br>提督「危ねぇ！」<br>（提督が時雨の体を支える）<br>がし…<br>時雨「……っ。」<br>提督「大丈夫か。」<br>時雨「大丈夫。…でも、心臓に悪い。」<br>提督「俺の方が悪い。」<br>時雨「悪いの、どっちも。」<br>提督「何が。」<br>時雨「触れ方。…急すぎ。」<br>提督「……次は声かける。」<br>時雨「うん。…声、聞きたいから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（提督が梱包ひもを結べずにもたつく）<br>提督「ほどける…」<br>時雨「貸して。」<br>（時雨が背後から腕を回して結ぶ）<br>さわ…<br>提督「後ろ、やめろ。」<br>時雨「前だと見えない。」<br>提督「見えなくていい。」<br>時雨「だめ。…ちゃんと結ぶ。君も、ちゃんと我慢して。」<br>提督「我慢って言うな。」<br>時雨「言う。…顔が熱い。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（台車を二人で押す。狭い通路で距離が詰まる）<br>提督「もっと前。」<br>時雨「行けない。」<br>提督「じゃあ俺が下がる。」<br>時雨「下がらないで。」<br>提督「え？」<br>時雨「離れるの…もったいない。」<br>提督「はっきり言うな。」<br>時雨「はっきり言う。…黙ってると、君は逃げるから。」<br>────────────────────────</div></div>`
+        ],
+      },
+      "quarters": {
+        basic: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「居住区って、気配が違うな。」<br>時雨「生活の場所だから。」<br>提督「司令室より緩む？」<br>時雨「少しだけ。…でも、油断はしない。」<br>提督「癖になってるな。」<br>時雨「癖で守られた命もある。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「干してるの、誰のだ？」<br>時雨「当番の分。まとめてやる方が効率いい。」<br>提督「偉いな。」<br>時雨「偉くない。回すため。」<br>提督「回すって言葉、好きだな。」<br>時雨「止まる方が怖いから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「さっきの音、誰か転んだ？」<br>時雨「大丈夫。多分、桶を落としただけ。」<br>提督「よく分かるな。」<br>時雨「生活音は覚える。」<br>提督「覚えすぎじゃないか。」<br>時雨「提督の足音も覚えてる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「ここに来ると、急に“基地”じゃなくなるな。部屋があって、匂いがあって、誰かの私物がある。戦争中は全部“機能”に見えてたのに。」<br>時雨「今は“暮らし”が戻ったからだよ。僕らは艦だけど、艦だけじゃ続かない。休む、食べる、笑う。そういうのがないと、心が先に壊れる。…提督が居住区で緩むなら、それは良いことだ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「ふとした瞬間にさ、ここって艦娘しかいないって思い出す。街もない。人混みもない。…贅沢言うと、外が恋しくなる。」<br>時雨「恋しくなるのは自然だよ。だからって、全部を壊す選び方はしないで。外を恋しがるのと、いなくなるのは違う。…提督が息抜きを探すなら、僕も一緒に考える。ここでできる息抜きから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「夜、見回りする？」<br>時雨「する。居住区は寝てる時が一番無防備。」<br>提督「今は敵もいないのに。」<br>時雨「敵がいなくても、事故はある。体調もある。…それに、見回りは安心を配る仕事だよ。提督が回ると、みんな眠りやすい。」<br>---</div></div>`
+        ],
+        doubt: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「この上着、どこだっけ。」<br>時雨「外に出る服？」<br>提督「いや、寒いだけ。」<br>時雨「寒いなら毛布がある。上着を探す理由、違うでしょ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「廊下、きしむな。」<br>時雨「君の歩き方が速い。」<br>提督「急いでない。」<br>時雨「急いでる。靴を履く音がいつもと違う。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「これ、誰の箱だ？」<br>時雨「備品。」<br>提督「軽いな。」<br>時雨「持つな。確認するまで触らないで。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「見回りって、毎晩やる必要あるのか？」<br>時雨「必要。特に君の部屋の前は。」<br>提督「俺が何かすると思ってる？」<br>時雨「“何かする”じゃない。“何かを準備する”を警戒してる。靴、上着、鍵。小さい行動が揃うと外に繋がる。」<br>提督「…そこまで見てんのか。」<br>時雨「見てる。居住区は生活の場所だからこそ、変化が目立つ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「眠れなくて歩いてただけだ。」<br>時雨「歩く理由は分かる。でも、廊下の端まで行って戻る癖が増えてる。」<br>提督「癖って言うな。」<br>時雨「癖は直せる。…提督、眠れないなら言って。話すなら食堂か司令室で。居住区の廊下で一人になるのは、良くない方向に寄る。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「合鍵、預けとけよ。楽だろ。」<br>時雨「楽でも渡さない。」<br>提督「信用してないのか。」<br>時雨「信用の話じゃない。鍵は“できること”を増やす。できることが増えると、やりたくなる。君は今、やりたがってる。」<br>---</div></div>`
+        ],
+        affection: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「お、時雨。」<br>時雨「提督、戻った。」<br>提督「ただいま、でいいのか？」<br>時雨「いい。言って。」<br>提督「…ただいま。」<br>時雨「おかえり。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「寒いな。」<br>時雨「毛布、持ってくる。」<br>提督「俺も動く。」<br>時雨「座ってて。今日くらい。」<br>提督「甘やかすな。」<br>時雨「甘やかす。君が頑張った日だから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「俺の足音、分かるのか。」<br>時雨「分かる。」<br>提督「怖いな。」<br>時雨「怖くない。安心する音。」<br>提督「変な言い方だ。」<br>時雨「変じゃない。僕には大事。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「居住区に来ると、急に気が抜ける。やることが減ったのに、疲れだけ残ってる日があるんだよな。」<br>時雨「疲れは急に消えない。戦争が終わっても、体は覚えてる。…だから、休んでいい。居住区は休むための場所。提督が休むと、僕も休める。」<br>提督「お前も休め。」<br>時雨「うん。一緒に、ね。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「誰もいない廊下って、静かすぎるな。」<br>時雨「静かだね。でも、嫌いじゃない。」<br>提督「なんで。」<br>時雨「提督の声がよく聞こえるから。小さい声でも、ちゃんと届く。…君が余計なことを言いそうな時も分かる。」<br>提督「最後の一言が怖い。」<br>時雨「怖がらせたいわけじゃない。止めるんじゃなくて、支えたいだけ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「最近さ、居住区に戻ると時雨がいることが多いな。」<br>時雨「タイミングが合ってるだけ。」<br>提督「合いすぎじゃない？」<br>時雨「…合うようにしてる。君が戻る時間を覚えた。」<br>提督「そこまで？」<br>時雨「そこまで。君が無事に戻るの、毎日ちゃんと見たい。」<br>---</div></div>`
+        ],
+        ecchi: [
+        `<div class="chatScene"><div class="chatSceneBody">（廊下で鉢合わせ。提督が避けきれず、時雨が壁へ寄せられる）<br>どん…<br>提督「悪い、狭――」<br>時雨「狭いの、分かってる。」<br>提督「……怒ってる？」<br>時雨「怒ってない。…でも、近いのは嫌じゃない。」<br>提督「どっちだよ。」<br>時雨「嫌じゃないけど、心臓がうるさい。だから、君のせい。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（夜。提督が薄着で出てきて、時雨が上着を持ってくる）<br>時雨「寒い。」<br>提督「平気。」<br>時雨「平気そうじゃない。」<br>（時雨が上着を羽織らせ、襟元を整える）<br>すっ…<br>提督「……手、冷たい。」<br>時雨「冷たい方がいい。熱いと、バレる。」<br>提督「何が。」<br>時雨「僕が、近いのを喜んでること。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（提督の指に時雨の髪が絡む）<br>さら…<br>提督「引っかかった。」<br>時雨「……引っ張らないで。」<br>提督「ほどく。」<br>（ほどく指が耳元をかすめ、時雨が肩をすくめる）<br>す…<br>時雨「くすぐったい。」<br>提督「痛くない？」<br>時雨「痛くない。…だから、もう少しゆっくり。」<br>提督「……注文多いな。」<br>時雨「君が下手だから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（提督が鍵を探してポケットをまさぐる）<br>提督「どこだ…」<br>時雨「貸して。」<br>提督「自分で――」<br>（時雨が提督のポケットに手を入れて探す）<br>ごそ…<br>提督「おい。」<br>時雨「動かないで。」<br>提督「動かなくていい状況じゃない。」<br>時雨「鍵。…はい、あった。」<br>提督「……近すぎ。」<br>時雨「近いのが嫌なら、鍵は落とさないで。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（提督の寝具が乱れている。時雨が毛布を引いて整える）<br>すっ…<br>提督「世話焼きだな。」<br>時雨「君が無防備。」<br>提督「無防備で悪いか。」<br>時雨「悪くない。…僕には、ちょうどいい。」<br>提督「お前、たまに言い方が危ない。」<br>時雨「危なくしてるのは、君。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（消灯後。居住区の廊下。声を落として）<br>提督「起きてたのか。」<br>時雨「起きてた。」<br>提督「眠れない？」<br>時雨「眠れる。でも…君の足音がしたから。」<br>提督「それで出てきた？」<br>時雨「うん。…少しだけ、近くにいたい。」<br>提督「理由は。」<br>時雨「理由を聞かれると、恥ずかしい。」<br>提督「言え。」<br>時雨「……君が、いないと落ち着かない。」<br>────────────────────────</div></div>`
+        ],
+      },
+      "mess": {
+        basic: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「今日、何だ？」<br>時雨「温かいの。冷めにくいようにした。」<br>提督「気が利くな。」<br>時雨「作ったのは僕じゃない。」<br>提督「でも、分かってる。」<br>時雨「分かってる方が、役に立つ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「少し濃いか？」<br>時雨「塩気は控えめ。君の分は特に。」<br>提督「俺の分だけ？」<br>時雨「顔色が違う。疲れてる時は濃いのがきつい。」<br>提督「見抜かれてるな。」<br>時雨「食堂は顔が見える。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「そこ、空いてる？」<br>時雨「空いてる。隣でもいい。」<br>提督「気を遣ってないか？」<br>時雨「遣ってる。…でも、嫌じゃない。」<br>提督「素直だな。」<br>時雨「食べてる時に嘘はつけない。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「戦争中は“食えるだけでありがたい”って感じだったのに、今は味とか温度とか、贅沢に気になる。贅沢していいのかって、たまに引っかかる。」<br>時雨「いいよ。贅沢じゃない。生きてる実感を戻す行為だ。温かいものを温かいうちに食べるのは、当たり前の権利。…提督が引っかかるなら、僕が言う。これは“守った結果”だって。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「食堂って、本当はもっと騒がしい場所なんだろうな。」<br>時雨「ここは人数が少ないからね。」<br>提督「静かすぎると、逆に落ち着かない。」<br>時雨「じゃあ、提督が話せばいい。軽い話でいい。今日の味でも、天気でも。…提督の声があると、食堂が食堂になる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「片付け、俺もやるか。」<br>時雨「皿は水につけて。汚れが落ちやすい。」<br>提督「了解。…こういうの、時雨は慣れてるな。」<br>時雨「慣れた。暮らしが続く限り、慣れる。提督も慣れて。できることが増えると、外に逃げたくなる回数が減るから。」<br>---</div></div>`
+        ],
+        doubt: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「今日は食欲ない。」<br>時雨「嘘。」<br>提督「嘘じゃない。」<br>時雨「本土の話をした後は、いつも減る。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「この酒、まだ残ってたか。」<br>時雨「残ってる。でも出さない。」<br>提督「なんでだよ。」<br>時雨「酔うと口が軽くなる。今は軽くしないで。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「今日はそっち座る。」<br>時雨「出口に近い席だね。」<br>提督「たまたまだ。」<br>時雨「たまたまが続くと、たまたまじゃない。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「俺が外に行きたいって言うと、空気が悪くなるな。」<br>時雨「悪くなる。君が軽く言うから。軽く言うのに、目が本気だから。」<br>提督「本気じゃない。娯楽が恋しいだけ。」<br>時雨「その“だけ”が危ない。ここには娯楽が少ない。だから外が大きく見える。…提督、食堂では食べて。外の話は食べ終わってから。今は体を優先して。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「片付け、手伝う。」<br>時雨「いい。今日は僕がやる。」<br>提督「珍しいな。いつも一緒だろ。」<br>時雨「今日は君を台所の奥に入れたくない。勝手に何か持って行かれたくないから。」<br>提督「…そこまで言うか。」<br>時雨「言う。疑念がある時は、言葉にして止める。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「味、薄くないか？」<br>時雨「薄い方がいい。君、今は落ち着いてない。」<br>提督「味と関係あるか？」<br>時雨「ある。濃い味は勢いがつく。勢いがつくと、余計なことを言う。余計なことを言うと、僕が止める。…止めたくないから、薄くしてる。」<br>---</div></div>`
+        ],
+        affection: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「隣、空いてる？」<br>時雨「空いてる。座って。」<br>提督「今日は素直だな。」<br>時雨「食堂は素直になりやすい。」<br>提督「なんで。」<br>時雨「温かいから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「味、どう？」<br>時雨「ちょうどいい。」<br>提督「本当か。」<br>時雨「本当。…提督が作ると、少し嬉しい。」<br>提督「嬉しいって言うなよ。」<br>時雨「言う。今は。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「片付け、俺がやる。」<br>時雨「一緒にやる。」<br>提督「任せろって。」<br>時雨「任せない。君と並ぶのが好きだから。」<br>提督「言うなぁ。」<br>時雨「言うよ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「戦争が終わって、食事が“作業”じゃなくなった。噛む余裕ができたっていうか…今は、こうやって座ってる時間が大事に感じる。」<br>時雨「大事だよ。食べるのは生きることだし、誰かと食べるのは戻ってきた証拠。…提督がここで落ち着くなら、僕はそれを守りたい。味より、時間を守る感じ。」<br>提督「時雨らしい言い方だな。」<br>時雨「僕らしいでしょ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「人数少ないと、食堂も静かだな。」<br>時雨「静かでもいい。提督が話したい時だけ話せば。」<br>提督「じゃあ…今日、疲れた。」<br>時雨「知ってる。顔が柔らかくない。」<br>提督「それ慰めか？」<br>時雨「慰め。食べて、少し楽になって。…僕が隣にいる間は、ちゃんと息をして。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「皿、まとめて持つぞ。」<br>時雨「落とすよ。二枚ずつにして。」<br>提督「はいはい。」<br>時雨「はいはい、って言い方。」<br>提督「だって、時雨の言う通りなんだろ。」<br>時雨「うん。…でも、素直に従うのは嬉しい。」<br>提督「それも言うのか。」<br>時雨「言う。言っておかないと、伝わらないから。」<br>---</div></div>`
+        ],
+        ecchi: [
+        `<div class="chatScene"><div class="chatSceneBody">（提督が味見用のスプーンを持つ。時雨が先に取って一口）<br>提督「それ、俺が――」<br>時雨「味、見る。」<br>提督「……普通にドキッとする。」<br>時雨「味は普通。」<br>提督「味の話じゃない。」<br>時雨「じゃあ、提督も味見して。…同じ条件で。」<br>提督「……顔、見んな。」<br>時雨「見る。赤いから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（皿を運ぶ通路が狭い。腕が触れ続ける）<br>す…<br>提督「当たってる。」<br>時雨「落とすよりいい。」<br>提督「……落とさないように運べ。」<br>時雨「落とさない。…だから我慢して。」<br>提督「我慢って言うな。」<br>時雨「言う。君、顔に出るから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（時雨のエプロン紐がほどけている）<br>提督「紐、ほどけてる。」<br>時雨「結べない。」<br>提督「は？」<br>時雨「後ろ、届かない。」<br>（提督が結び直す。背中が近い）<br>きゅ…<br>時雨「……そのまま、少しだけ。」<br>提督「何をだよ。」<br>時雨「近い距離。」<br>提督「……仕事中だぞ。」<br>時雨「仕事中だから。言い訳できる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（湯気の立つ鍋を二人で覗き込む。視界が白い）<br>提督「熱っ。」<br>時雨「近すぎ。」<br>提督「時雨も近い。」<br>（湯気の向こうで目が合う）<br>時雨「……目、見ないで。」<br>提督「なんで。」<br>時雨「赤くなる。」<br>提督「もう赤い。」<br>時雨「言わないで。…余計に赤くなる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（時雨の頬に水滴。提督が指で拭う）<br>すっ…<br>時雨「……勝手に触らないで。」<br>提督「拭いただけだ。」<br>時雨「拭くなら…言ってから。」<br>提督「言っただろ。」<br>時雨「言い方がずるい。」<br>提督「どうずるい。」<br>時雨「優しい声だった。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（閉店後。時雨が振り向いたところに提督が来ていて距離が詰まる）<br>どん…<br>提督「悪い、止まれなかった。」<br>時雨「止まって。」<br>提督「止まってる。」<br>時雨「まだ近い。」<br>提督「……離れる？」<br>時雨「離れなくていい。…でも、ちゃんと意識して。」<br>提督「何を。」<br>時雨「僕を。」<br>────────────────────────</div></div>`
+        ],
+      },
+      "watchtower": {
+        basic: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「見えるか？」<br>時雨「海面は穏やか。船影なし。」<br>提督「本当に何もないな。」<br>時雨「何もないのが、いい。」<br>提督「それでも見てる。」<br>時雨「見てる。見張りは習慣。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「風、強いな。」<br>時雨「帽子、飛ぶよ。」<br>提督「押さえとくか。」<br>時雨「うん。…提督、前髪が乱れてる。」<br>提督「今言うか？」<br>時雨「今しか見えないから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「夕焼け、綺麗だ。」<br>時雨「綺麗だね。」<br>提督「戦争中は見る余裕なかったな。」<br>時雨「余裕が戻った。」<br>提督「余裕…か。」<br>時雨「提督が作った余裕だよ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「敵もいないのに、見張り台に立つって変かな。」<br>時雨「変じゃない。見張りは“敵を見る”だけじゃない。天気の変化も、船の動きも、島の様子も見る。事故を先に見つける。…それに、見張り台に人が立つと、鎮守府が締まる。提督が上がるなら、なおさら。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「ここからだと、外が近く見えるな。夜の灯りとか、航路とか。…手を伸ばせば届きそうに見える。」<br>時雨「見えるのと、届くのは違うよ。届くように見えるのは、気持ちが先に動いてる時だ。…提督、外を見ていい。でも戻ってくる前提で見て。僕は、戻る人の隣でなら外を一緒に眺められる。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「見張りって、会話が減るな。」<br>時雨「減る。でも、その分、考えが整理される。」<br>提督「俺は考えすぎるタイプだ。」<br>時雨「だから、景色を見て。考えを一度止める。…司令室じゃできない“止め方”が、ここならできる。」</div></div>`
+        ],
+        doubt: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「何も見えないな。」<br>時雨「見えるよ。航路の灯り。」<br>提督「そっち、よく見てるな。」<br>時雨「君がそっちを見るから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「風、冷たい。」<br>時雨「柵の内側に寄って。」<br>提督「大げさだ。」<br>時雨「大げさでいい。落ちたら終わり。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「もう降りるか。」<br>時雨「まだ。」<br>提督「何で。」<br>時雨「君が“降りたい顔”じゃないから。外を見足りてない。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「ほら、あの灯り。あっちに行けば店も人もあるんだよな。…ここは静かすぎる。」<br>時雨「静かで回ってるのがこの鎮守府だよ。君が欲しいのは分かる。でも、見張り台で“行けば”って言うのはやめて。ここは見張る場所。夢を見る場所じゃない。君の夢は、行動に変わるから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「ちょっとだけ、外側に体預ける。」<br>時雨「だめ。戻って。」<br>提督「落ちないって。」<br>時雨「落ちる落ちないじゃない。外側に寄る癖がつくのが嫌。癖になると、次は“夜の埠頭”に行く。君の行動、段階を踏むから。」<br>提督「…決めつけるな。」<br>時雨「決めつけじゃない。今まで失敗してる。だから段階で止める。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「先に戻ってていいぞ。」<br>時雨「だめ。一緒に降りる。」<br>提督「過保護だな。」<br>時雨「過保護でいい。君が一人になる時間を作りたくない。今は特に。…帰ったら司令室で、ちゃんと話そう。ここで外を見続けるのは、良くない。」</div></div>`
+        ],
+        affection: [
+        `<div class="chatScene"><div class="chatSceneBody">提督「何か見える？」<br>時雨「航路の灯り。今日は遠くまで綺麗。」<br>提督「綺麗だな。」<br>時雨「うん。…提督が見ると、僕も見やすい。」<br>提督「一緒に見るだけだろ。」<br>時雨「一緒が大事。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「風、強いな。」<br>時雨「こっち。壁が風よけになる。」<br>提督「近いぞ。」<br>時雨「寒いよりいい。」<br>提督「時雨、意外と図太いな。」<br>時雨「提督の隣だけ。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「夕焼け、好きか？」<br>時雨「好き。終わりが見えるから。」<br>提督「終わりって言うなよ。」<br>時雨「怖い意味じゃない。今日は終わって、明日が来るって意味。」<br>提督「それなら、いい。」<br>時雨「うん。提督と見ると、特にいい。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「昔は見張り台って緊張の塊だったのにな。今は、景色を見る場所になった。」<br>時雨「景色を見る余裕が戻ったんだよ。見張りは続けるけど、肩に力を入れ続けなくていい。…提督がここで少し楽そうにしてるのを見ると、僕も安心する。」<br>提督「お前、安心ばっか言うな。」<br>時雨「安心が大事だから。君がここにいて、ちゃんと景色を見てる。それが嬉しい。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「外の灯りを見ると、色々思うな。」<br>時雨「思っていい。でも、戻る場所はここだよ。」<br>提督「言い切るな。」<br>時雨「言い切る。君が戻るって分かってるから。…外を見ても、僕は隣で見られる。隣で見られるなら、僕は怖くない。」<br>提督「時雨、強いな。」<br>時雨「強くなる。君のために。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">提督「そろそろ戻るか。」<br>時雨「うん。…提督、手すり、冷たいね。」<br>提督「触ったのか。」<br>時雨「触った。君が触ってたから。」<br>提督「真似かよ。」<br>時雨「真似。君の癖、嫌いじゃない。…戻ろう。風邪ひく前に。」</div></div>`
+        ],
+        ecchi: [
+        `<div class="chatScene"><div class="chatSceneBody">（風が強い。時雨が提督の影に入る）<br>提督「こっち来るな、寒いだろ。」<br>時雨「寒い。」<br>提督「じゃあ離れろ。」<br>時雨「離れるともっと寒い。」<br>提督「屁理屈。」<br>時雨「事実。…君、温かい。」<br>提督「聞こえる言い方するな。」<br>時雨「聞こえた？じゃあ、成功。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（提督が双眼鏡を覗く。時雨が横から覗きたがる）<br>時雨「貸して。」<br>提督「順番。」<br>時雨「今。」<br>（提督が持ったまま、時雨が顔を寄せて覗く）<br>提督「……近い。」<br>時雨「見える。」<br>提督「それ以上寄るな。」<br>時雨「寄らないと、同じ景色にならない。」<br>提督「同じ景色でどうする。」<br>時雨「同じ気持ちにする。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（手すりに手を置く。時雨が同じ位置に指を重ねる）<br>ぴと…<br>提督「同じとこ置くなよ。」<br>時雨「置きたくなった。」<br>提督「理由。」<br>時雨「君が触ってたから。」<br>提督「子供か。」<br>時雨「子供じゃない。…だから、やってる。」<br>提督「意味分かんねぇ。」<br>時雨「分からなくていい。…感じて。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（見張りの合間。時雨が提督の背後から小声）<br>時雨「…右、航路灯。」<br>提督「分かってる。」<br>提督「……近い。」<br>時雨「声、風に消えるから。」<br>提督「じゃあ大きい声で――」<br>時雨「だめ。ここでは小さい声で言いたい。」<br>提督「理由は。」<br>時雨「君が…僕の声だけ聞く顔になるから。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（階段を降りる。暗くて足元が不安）<br>提督「大丈夫か？」<br>時雨「大丈夫。」<br>（時雨が提督の手を掴む）<br>ぎゅ…<br>提督「大丈夫って言いながら掴むな。」<br>時雨「大丈夫じゃない時は、もっと掴む。」<br>提督「……脅しみたいだ。」<br>時雨「脅しじゃない。約束。」<br>提督「約束、守るなよ。」<br>時雨「守る。」</div></div>`,
+        `<div class="chatScene"><div class="chatSceneBody">（見張りを終えて降りる直前。風が強く、提督が手すりを掴む）<br>提督「そろそろ戻るか。」<br>時雨「うん。」<br>（時雨が提督の背中に手を当て、軽く押す）<br>とん…<br>提督「押すな。」<br>時雨「落ちないように。」<br>提督「俺が落ちるわけ――」<br>時雨「落ちるのは、気持ちの方。」<br>提督「……お前、今言ったな。」<br>時雨「言った。…戻ろう。風邪ひく前に。」</div></div>`
+        ],
+      },
+    };
+
+
+
+
     function D(){ return S.dlg.shigure; }
 
     function ctxBase(context){
@@ -1498,6 +2123,12 @@ const Dialogue = (() => {
     }
 
     function npcLineNormal(c){
+      if(c.loc==="bridge"){
+        // 司令室：平常時は基本→親密、さらに稀にラッキースケベ
+        if(c.intimacy>=60 && c.trust>=70 && chance(18)) return pick(HQ_BANK.ecchi);
+        if(c.intimacy>=40 && chance(40)) return pick(HQ_BANK.affection);
+        return pick(HQ_BANK.basic);
+      }
       if(c.loc==="dock"){
         return pick([
           "時雨「……埠頭。夜の波は、音が大きいね」",
@@ -1505,20 +2136,13 @@ const Dialogue = (() => {
           "時雨「提督、ここは…見張りが来る」",
         ]);
       }
-      if(c.loc==="radio_room"){
-        return pick([
-          "時雨「無線室…？　珍しいね」",
-          "時雨「…音、聞いてる？」",
-          "時雨「灯りが落ち着かない。…僕も同じかな」",
-        ]);
+      // 司令室以外：ロケーション別の会話集（基本→親密、稀にラッキースケベ）
+      if(LOC_BANK[c.loc]){
+        if(c.intimacy>=60 && c.trust>=70 && chance(16)) return pick(LOC_BANK[c.loc].ecchi);
+        if(c.intimacy>=40 && chance(40)) return pick(LOC_BANK[c.loc].affection);
+        return pick(LOC_BANK[c.loc].basic);
       }
-      if(c.loc==="workshop"){
-        return pick([
-          "時雨「工廠。油の匂いがする」",
-          "時雨「整備？　…提督の手、汚れるよ」",
-          "時雨「工具の音って、夜だと余計に響く」",
-        ]);
-      }
+
 
       if(c.tags.includes("unnoticed")){
         return pick([
@@ -1544,18 +2168,18 @@ const Dialogue = (() => {
     }
 
     function npcLineSuspect(c){
+      if(c.loc==="bridge"){
+        return pick(HQ_BANK.doubt);
+      }
       if(c.loc==="dock"){
         startThread("dock_stop");
         return "時雨「……提督。そこは、行き止まりじゃない。…でも“帰り道”にもならない」";
       }
-      if(c.loc==="radio_room"){
-        startThread("radio_probe");
-        return "時雨「無線。…誰に繋ぐつもり？」";
+      // 司令室以外：疑念時はロケーション別「疑念」会話集
+      if(LOC_BANK[c.loc]){
+        return pick(LOC_BANK[c.loc].doubt);
       }
-      if(c.loc==="workshop"){
-        startThread("workshop_probe");
-        return "時雨「整備の音は残る。…君の“予定”も残るよ」";
-      }
+
       startThread("suspect_probe");
       return pick([
         "時雨「……提督。行き先を、聞いていい？」",
