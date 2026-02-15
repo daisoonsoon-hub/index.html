@@ -46,6 +46,16 @@
   .sceneImg{height:150px;border-radius:14px;border:1px solid rgba(255,255,255,.10);overflow:hidden;background:#0b0c10}
   .sceneImg img{width:100%;height:100%;object-fit:cover;display:block;opacity:.95}
 
+  /* --- Media / Portrait UI --- */
+  .portraitRow{display:flex;gap:10px;align-items:stretch;margin-top:10px}
+  .portraitBox{width:120px;min-width:120px;height:140px;border-radius:14px;border:1px solid rgba(255,255,255,.10);overflow:hidden;background:#0b0c10;display:flex;align-items:center;justify-content:center}
+  .portraitBox img{width:100%;height:100%;object-fit:cover;display:block}
+  .portraitInfo{flex:1;min-width:0;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.03);padding:10px;display:flex;flex-direction:column;gap:6px}
+  .portraitInfo .nm{font-weight:950}
+  .portraitInfo .tx{color:var(--muted);font-size:12px;line-height:1.55}
+  input[type="range"]{width:100%}
+
+
   .modalWrap{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:flex-end;justify-content:center;padding:12px}
   .modalWrap.show{display:flex}
   .modal{
@@ -59,6 +69,36 @@
   .modal .body{padding:12px}
   .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;background:rgba(20,22,28,.95);border:1px solid rgba(255,255,255,.12);padding:10px 12px;border-radius:14px;display:none}
   .toast.show{display:block}
+
+  /* ===== UI LAYOUT v3: Sidebar HUD + Center Stage ===== */
+  .uiRow{display:flex;gap:10px;align-items:stretch}
+  .leftCol{max-width:320px}
+  .stageCard .bd{padding:10px}
+  .timeBanner{height:92px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.10);background:linear-gradient(180deg,#0b1224,#0b0c10);position:relative}
+  .timeBanner img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.95}
+  .stageInfo{margin-top:10px;padding:10px 12px;border-radius:14px;background:rgba(12,14,20,.55);border:1px solid rgba(255,255,255,.10)}
+  .locStage{margin-top:10px;position:relative;border:1px solid rgba(255,255,255,.10);border-radius:18px;overflow:hidden;background:#0b0c10;height:42vh;min-height:320px;max-height:640px}
+  .locStage img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.95}
+  .sceneShade{position:absolute;inset:0;background:linear-gradient(to bottom, rgba(0,0,0,.10), rgba(0,0,0,.55))}
+  .hudChips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;background:rgba(18,22,30,.62);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(6px);font-size:12px;color:rgba(255,255,255,.9)}
+  .chip b{font-weight:800;color:#fff}
+  .log{height:52vh;max-height:none}
+
+  /* Portrait overlay (kept) */
+  .scenePortrait{position:absolute;left:10px;right:10px;bottom:10px;display:flex;gap:10px;align-items:flex-end}
+  .scenePortrait .portraitBox{width:160px;height:200px;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.35);flex:0 0 auto}
+  .scenePortrait .bubble{flex:1;min-height:86px;max-height:180px;overflow:auto;padding:10px 12px;border-radius:18px;background:rgba(12,14,20,.70);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(6px)}
+  .scenePortrait .nm{font-weight:900;margin-bottom:4px}
+  .scenePortrait .tx{color:rgba(255,255,255,.84);line-height:1.45}
+
+  @media (max-width: 980px){
+    .uiRow{flex-direction:column}
+    .leftCol{max-width:none}
+    .locStage{height:34vh}
+    .log{height:34vh}
+  }
+
 </style>
 </head>
 <body>
@@ -67,55 +107,80 @@
 <div class="sub">修正しやすいように「定数→状態→UI→遭遇→各コマンド→会話データ」の順に整理</div>
 </header>
 <main>
-<div class="card">
-<div class="hd">
-<div class="h" id="placeName">—</div>
-<div class="pill"><span>ターン</span> <b id="turn">0</b></div>
-<div class="pill"><span>警戒</span> <b id="alert">10</b></div>
-<div class="pill"><span>燃料</span> <b id="fuel">25</b></div>
-<div class="pill"><span>脱走疑い</span> <b id="suspect">なし</b></div>
-<button class="right" id="btnMenu" style="width:auto">MENU</button>
-</div>
-<div class="bd">
-<div class="sceneImg"><img alt="scene" id="sceneImg"/></div>
-<div class="hr"></div>
-<div class="grid2">
-<div>
-<div class="small muted">目的</div>
-<div id="objective" style="margin-top:4px">—</div>
-<div class="hr"></div>
-<div class="small muted">現在地の状況</div>
-<div id="situation" style="margin-top:4px">—</div>
-</div>
-<div>
-<div class="small muted">出現中</div>
-<div id="present" style="margin-top:4px">—</div>
-<div class="hr"></div>
-<div class="small muted">同行</div>
-<div id="party" style="margin-top:4px">—</div>
-<div class="hr"></div>
-<div class="small muted">所持品</div>
-<div id="inv" style="margin-top:4px">—</div>
-</div>
-</div>
-</div>
-</div>
-<div class="row">
-<div class="col card">
-<div class="hd"><div class="h">ログ</div><div class="small muted">（新しいほど下）</div></div>
-<div class="bd log" id="log"></div>
-</div>
-<div class="col" style="max-width:440px">
-<div class="card">
-<div class="hd"><div class="h">コマンド</div><div class="small muted">押す→対象選択</div></div>
-<div class="bd"><div class="grid3" id="cmdGrid"></div></div>
-</div>
-<div class="card">
-<div class="hd"><div class="h">艦娘</div><div class="small muted">信頼/親密</div></div>
-<div class="bd" id="chars"></div>
-</div>
-</div>
-</div>
+  <div class="card">
+    <div class="hd">
+      <div class="h" id="placeNameTop">—</div>
+      <div class="pill"><span>ターン</span> <b id="turn">0</b></div>
+      <div class="pill"><span>警戒</span> <b id="alert">10</b></div>
+      <div class="pill"><span>燃料</span> <b id="fuel">25</b></div>
+      <div class="pill"><span>脱走疑い</span> <b id="suspect">なし</b></div>
+      <button class="right" id="btnMenu" style="width:auto">MENU</button>
+    </div>
+  </div>
+
+  <div class="row uiRow">
+    <div class="col leftCol" style="max-width:320px">
+      <div class="card">
+        <div class="hd"><div class="h">HUD</div></div>
+        <div class="bd">
+          <div class="hudChips">
+            <div class="chip">目的 <b id="objective">—</b></div>
+            <div class="chip">出現 <b id="present">—</b></div>
+            <div class="chip">同行 <b id="party">—</b></div>
+            <div class="chip">所持 <b id="inv">—</b></div>
+          </div>
+          <div class="hr"></div>
+          <div class="small muted">※コマンドの右に「危険/静か/目立つ」タグが出る</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd"><div class="h">ログ</div><div class="small muted">（新しいほど下）</div></div>
+        <div class="bd log" id="log"></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card stageCard">
+        <div class="hd">
+          <div class="h" id="placeName">—</div>
+          <div class="small muted" id="timeLabel">—</div>
+        </div>
+        <div class="bd">
+          <div class="timeBanner" id="timeBanner"><img alt="time" id="timeImg"/></div>
+
+          <div class="stageInfo">
+            <div class="small muted">現在地の状況</div>
+            <div id="situationText">—</div>
+          </div>
+
+          <div class="locStage" id="scenePane">
+            <img alt="scene" id="sceneImg"/>
+            <div class="sceneShade"></div>
+
+            <div class="scenePortrait" id="portraitRow" style="display:none">
+              <div class="portraitBox"><img alt="portrait" id="charPortrait"/></div>
+              <div class="bubble">
+                <div class="nm" id="charPortraitName">—</div>
+                <div class="tx" id="charPortraitFlavor">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col" style="max-width:440px">
+      <div class="card">
+        <div class="hd"><div class="h">コマンド</div><div class="small muted">押す→対象選択</div></div>
+        <div class="bd"><div class="grid3" id="cmdGrid"></div></div>
+      </div>
+      <div class="card">
+        <div class="hd"><div class="h">艦娘</div><div class="small muted">信頼/親密</div></div>
+        <div class="bd" id="chars"></div>
+      </div>
+    </div>
+  </div>
 </main>
 <!-- 対象選択モーダル -->
 <div class="modalWrap" id="targetWrap">
@@ -160,6 +225,20 @@
 <button id="btnReplay">同条件で最初から（seed維持）</button>
 </div>
 <div class="hr"></div>
+<div class="small muted">音量・BGM</div>
+<div class="grid2" style="margin-top:8px">
+  <button id="btnBgmToggle">BGM：OFF</button>
+  <button id="btnSfxToggle">SE：ON</button>
+</div>
+<div style="margin-top:8px">
+  <div class="small muted">BGM音量</div>
+  <input id="bgmVol" type="range" min="0" max="100" value="35"/>
+</div>
+<div style="margin-top:8px">
+  <div class="small muted">SE音量</div>
+  <input id="sfxVol" type="range" min="0" max="100" value="60"/>
+</div>
+<div class="hr"></div>
 <div class="small muted">
         ・端末セーブは localStorage 使用。<br/>
         ・同条件リプレイは調整に便利。<br/>
@@ -167,6 +246,8 @@
 </div>
 </div>
 </div>
+<audio id="bgm" loop preload="none"></audio>
+<audio id="sfx" preload="none"></audio>
 <div class="toast" id="toast"></div>
 <script>
 /* =========================================================
@@ -175,22 +256,150 @@
 const App = (() => {
 
 /* =========================================================
+   00.5) メディア（BGM/SE）
+   - 音源は任意：存在しなければ無音で動作
+   - 端末制約で「最初の操作後」に再生が解禁される
+========================================================= */
+const Media = (() => {
+  const elBgm = document.getElementById("bgm");
+  const elSfx = document.getElementById("sfx");
+
+  const state = {
+    bgmOn:false,
+    sfxOn:true,
+    bgmVol:0.35,
+    sfxVol:0.60,
+    unlocked:false,
+    currentKey:"",
+  };
+
+  const BGM_MAP = {
+    early:   "./music/early.mp3",
+    morning: "./music/morning.mp3",
+    noon:    "./music/noon.mp3",
+    evening: "./music/evening.mp3",
+    night:   "./music/night.mp3",
+  };
+
+  function setVol(){
+    try{ elBgm.volume = state.bgmVol; }catch(_){}
+    try{ elSfx.volume = state.sfxVol; }catch(_){}
+  }
+
+  function unlock(){
+    if(state.unlocked) return;
+    state.unlocked = true;
+    // iOS/Chrome対策：無音でも一度 play() を試す
+    if(state.bgmOn) playBgmForPhase(phaseOfHour(clockHour()));
+  }
+
+  function playBgmForPhase(ph){
+    const key = ph || "night";
+    if(state.currentKey === key) return;
+    state.currentKey = key;
+
+    const src = BGM_MAP[key] || BGM_MAP.night;
+    if(!state.bgmOn) return;
+
+    try{
+      if(elBgm.src !== src) elBgm.src = src;
+      elBgm.volume = 0.0001; // フェードイン前
+      const p = elBgm.play();
+      if(p && p.catch) p.catch(()=>{});
+      // フェードイン（軽く）
+      const target = state.bgmVol;
+      const steps = 12;
+      let i=0;
+      const tick = ()=> {
+        i++;
+        const v = Math.min(target, (target/steps)*i);
+        elBgm.volume = v;
+        if(i<steps) setTimeout(tick, 70);
+      };
+      tick();
+    }catch(_){}
+  }
+
+  function stopBgm(){
+    try{
+      const steps = 10;
+      let i=steps;
+      const start = elBgm.volume || 0;
+      const tick = ()=> {
+        i--;
+        const v = (start/steps)*Math.max(i,0);
+        elBgm.volume = v;
+        if(i>0) setTimeout(tick, 50);
+        else { try{ elBgm.pause(); }catch(_){} }
+      };
+      tick();
+    }catch(_){}
+  }
+
+  function updateBgm(){
+    if(!state.bgmOn) return;
+    playBgmForPhase(phaseOfHour(clockHour()));
+  }
+
+  function toggleBgm(){
+    state.bgmOn = !state.bgmOn;
+    if(state.bgmOn){
+      if(state.unlocked) playBgmForPhase(phaseOfHour(clockHour()));
+    }else{
+      stopBgm();
+    }
+    return state.bgmOn;
+  }
+
+  function toggleSfx(){
+    state.sfxOn = !state.sfxOn;
+    return state.sfxOn;
+  }
+
+  function sfx(name){
+    if(!state.sfxOn) return;
+    const map = {
+      enter:"./sfx/enter.mp3",
+      talk:"./sfx/talk.mp3",
+      item:"./sfx/item.mp3",
+      click:"./sfx/click.mp3",
+    };
+    const src = map[name];
+    if(!src) return;
+    try{
+      elSfx.pause();
+      elSfx.currentTime = 0;
+      elSfx.src = src;
+      elSfx.volume = state.sfxVol;
+      const p = elSfx.play();
+      if(p && p.catch) p.catch(()=>{});
+    }catch(_){}
+  }
+
+  function setBgmVol(v){ state.bgmVol = Math.max(0, Math.min(1, v)); setVol(); }
+  function setSfxVol(v){ state.sfxVol = Math.max(0, Math.min(1, v)); setVol(); }
+
+  return {state, unlock, updateBgm, toggleBgm, toggleSfx, sfx, setBgmVol, setSfxVol};
+})();
+
+
+/* =========================================================
    01) 定数（世界データ）
    - ここを増やす：場所 / 艦娘 / アイテム / コマンド
 ========================================================= */
 const CMD = [
-  {id:"move", label:"移動", hint:"移動先を選ぶ"},
-  {id:"examine", label:"調べる", hint:"場所/物/人物を調べる（調べるほど対象が増える）"},
-  {id:"touch", label:"触る", hint:"装置/扉/人物に触れる"},
-  {id:"hide", label:"隠れる", hint:"回避（見られてる時は怪しまれることも）"},
-  {id:"pickup", label:"拾う", hint:"発見済みの物だけ拾える（有限）"},
-  {id:"drop", label:"捨てる", hint:"所持枠整理"},
-  {id:"talk", label:"話す", hint:"対象選択→NPC台詞はログ確定→返答だけ選ぶ"},
-  {id:"use", label:"使う", hint:"アイテム/装置に使う"},
-  {id:"order", label:"命令", hint:"同行/指示。信頼が低いと反発"},
-  {id:"run", label:"逃げる", hint:"露骨な離脱行動（疑いが濃くなる）"},
-  {id:"apologize", label:"謝る", hint:"空気を戻す（場面によって有効/無効）"},
-  {id:"fight", label:"闘う", hint:"交戦。疑いは確定する"},
+  {id:"move", label:"移動", tag:"静か", hint:"移動先を選ぶ"},
+  {id:"examine", label:"調べる", tag:"静か", hint:"場所/物/人物を調べる（調べるほど対象が増える）"},
+  {id:"touch", label:"触る", tag:"目立つ", hint:"装置/扉/人物に触れる"},
+  {id:"hide", label:"隠れる", tag:"静か", hint:"回避（見られてる時は怪しまれることも）"},
+  {id:"pickup", label:"拾う", tag:"目立つ", hint:"発見済みの物だけ拾える（有限）"},
+  {id:"drop", label:"捨てる", tag:"静か", hint:"所持枠整理"},
+  {id:"talk", label:"話す", tag:"目立つ", hint:"対象選択→NPC台詞はログ確定→返答だけ選ぶ"},
+  {id:"use", label:"使う", tag:"目立つ", hint:"アイテム/装置に使う"},
+  {id:"order", label:"命令", tag:"目立つ", hint:"同行/指示。信頼が低いと反発"},
+  {id:"run", label:"逃げる", tag:"危険", hint:"露骨な離脱行動（疑いが濃くなる）"},
+  {id:"apologize", label:"謝る", tag:"静か", hint:"空気を戻す（場面によって有効/無効）"},
+  {id:"fight", label:"闘う", tag:"危険", hint:"交戦。疑いは確定する"},
 ];
 
 const CHAR = {
@@ -414,17 +623,26 @@ let S = defaultState();
 ========================================================= */
 const el = {
   log: document.getElementById("log"),
+  placeNameTop: document.getElementById("placeNameTop"),
   placeName: document.getElementById("placeName"),
   turn: document.getElementById("turn"),
   alert: document.getElementById("alert"),
   fuel: document.getElementById("fuel"),
   suspect: document.getElementById("suspect"),
   objective: document.getElementById("objective"),
-  situation: document.getElementById("situation"),
+  situationText: document.getElementById("situationText"),
+  situation: document.getElementById("situationText"),
   present: document.getElementById("present"),
   party: document.getElementById("party"),
   inv: document.getElementById("inv"),
+
+  timeImg: document.getElementById("timeImg"),
+  timeLabel: document.getElementById("timeLabel"),
   sceneImg: document.getElementById("sceneImg"),
+  portraitRow: document.getElementById("portraitRow"),
+  charPortrait: document.getElementById("charPortrait"),
+  charPortraitName: document.getElementById("charPortraitName"),
+  charPortraitFlavor: document.getElementById("charPortraitFlavor"),
   chars: document.getElementById("chars"),
   cmdGrid: document.getElementById("cmdGrid"),
   toast: document.getElementById("toast"),
@@ -487,6 +705,74 @@ function invText(){
   return S.inventory.map(it=>`<span class="pill"><b>${ITEMS[it]?.name ?? it}</b></span>`).join(" ");
 }
 
+function trustTier(c){
+  const t=c.trust||0;
+  if(t>=80) return "high";
+  if(t>=60) return "mid";
+  return "low";
+}
+function pickPortraitExpr(id){
+  const c=S.chars[id];
+  const tier=trustTier(c);
+  if(S.suspect) return "suspicious";
+  if(c.intimacy>=60 && tier!=="low") return "intimate";
+  if(tier==="high") return "friendly";
+  if(tier==="mid") return "neutral";
+  return "cold";
+}
+function portraitFlavorText(id){
+  const c=S.chars[id];
+  const tier=trustTier(c);
+  const loc = locCanon(S.location);
+  const locName = LOC[S.location].name;
+  const base = {
+    low:`${locName}で、視線が少しだけ硬い。`,
+    mid:`${locName}で、距離はあるが話は通る。`,
+    high:`${locName}で、空気が柔らかい。`,
+  }[tier];
+  if(S.suspect) return `${locName}で、言葉が短い。疑いが混じる。`;
+  if(c.intimacy>=60 && c.trust>=70) return `${locName}で、目が笑っている。`;
+  return base;
+}
+function setPortrait(id){
+  if(!id || !S.chars[id]){
+    el.portraitRow.style.display="none";
+    return;
+  }
+  const c=S.chars[id];
+  el.portraitRow.style.display="flex";
+  el.charPortraitName.textContent = c.name;
+  el.charPortraitFlavor.textContent = portraitFlavorText(id);
+
+  const expr = pickPortraitExpr(id);
+  const base = `./images/chars/${id}/`;
+  const candidates = [
+    `${base}${expr}.webp`,
+    `${base}${expr}.png`,
+    `${base}neutral.webp`,
+    `${base}neutral.png`,
+  ];
+  let k=0;
+  const img = el.charPortrait;
+  const tryNext = ()=>{
+    if(k>=candidates.length){
+      img.removeAttribute("src");
+      return;
+    }
+    img.src = candidates[k++];
+  };
+  img.onerror = tryNext;
+  tryNext();
+}
+function setPortraitFromPresent(){
+  if(S.present && S.present.length){
+    setPortrait(S.present[0].id);
+  }else{
+    el.portraitRow.style.display="none";
+  }
+}
+
+
 function renderChars(){
   const ids=Object.keys(S.chars);
   const rows=ids.map(id=>{
@@ -506,19 +792,101 @@ function renderChars(){
   el.chars.innerHTML = `<div>${rows}</div>`;
 }
 
-function renderTop(){
+
+function setTimeImage(){
+  const h = clockHour();
+  const ph = phaseOfHour(h);
+  const img = el.timeImg;
+  if(!img) return;
+  const tryList = [
+    `./images/time/${ph}.webp`,
+    `./images/time/${ph}.jpg`,
+    `./images/time/${ph}.png`,
+  ];
+  let i=0;
+  const fallback = ()=>{ img.onerror=null; img.src = LOC[S.location].img(h); };
+  const tryNext = ()=>{
+    if(i>=tryList.length) return fallback();
+    img.src = tryList[i++];
+  };
+  img.onerror = tryNext;
+  tryNext();
+}
+
+function setSceneImage(){
+  const h = clockHour();
+  const ph = phaseOfHour(h);
+  const loc = S.location;
+
+  // 時間帯で「点灯/消灯」差分がある背景向け（夜/早朝=消灯、その他=点灯）
+  const lightKey = (ph==="night" || ph==="early") ? "off" : "on";
+
+  // 画像があるならそちら優先（無ければ内蔵SVG）
+  // まず「場所×時間帯」を探し、次に「場所固定」、最後に内蔵SVGへフォールバック。
+  const tryList = [];
+
+  // --- 追加: 立ち絵/背景素材のファイル名（ASCII推奨 + 日本語ファイル名も吸収） ---
+  // 推奨配置（どれか一つでもOK）
+  //  ./images/bg/bath_on.jpg, bath_off.jpg
+  //  ./images/bg/storage_on.jpg, storage_off.jpg
+  //  またはユーザーが用意した日本語ファイル名をそのまま置いても拾う（encodeURIで指定）
+  if(loc==="bath"){
+    tryList.push(`./images/bg/bath_${lightKey}.webp`, `./images/bg/bath_${lightKey}.jpg`);
+    // 日本語ファイル名（そのまま置いた場合）
+    tryList.push(encodeURI(`./images/bg/nc228314_大浴場の脱衣所.jpg`));
+    tryList.push(encodeURI(`./images/bg/nc228315_大浴場の脱衣所（消灯）.jpg`));
+  }
+  if(loc==="storage"){
+    tryList.push(`./images/bg/storage_${lightKey}.webp`, `./images/bg/storage_${lightKey}.jpg`);
+    tryList.push(encodeURI(`./images/bg/物置（照明ON）.jpg`));
+    tryList.push(encodeURI(`./images/bg/物置（照明OFF）.jpg`));
+  }
+
+  // 共通ルール（既存）
+  tryList.push(
+    `./images/bg/${loc}_${ph}.webp`,
+    `./images/bg/${loc}_${ph}.jpg`,
+    `./images/bg/${loc}.webp`,
+    `./images/bg/${loc}.jpg`
+  );
+
+  let i=0;
+  const img = el.sceneImg;
+  const fallback = ()=>{ img.onerror=null; img.src = LOC[loc].img(h); };
+  const tryNext = ()=>{
+    if(i>=tryList.length) return fallback();
+    img.src = tryList[i++];
+  };
+  img.onerror = tryNext;
+  tryNext();
+}
+
+function renderTop(
+){
   el.placeName.textContent = LOC[S.location].name;
+  if(el.placeNameTop) el.placeNameTop.textContent = LOC[S.location].name;
   el.turn.textContent = S.turn;
   el.alert.textContent = S.alert;
   el.fuel.textContent = S.fuel;
   el.suspect.textContent = S.suspect ? "あり" : "なし";
+  if(el.timeLabel){
+    const h = clockHour();
+    const ph = phaseOfHour(h);
+    const label = {night:"夜",early:"未明",morning:"朝",noon:"昼",evening:"夕"}[ph] || ph;
+    el.timeLabel.textContent = `${Math.floor(h)}時帯：${label}`;
+  }
   el.objective.innerHTML = objectiveText();
-  el.situation.innerHTML = situationText();
+  if(el.situationText) el.situationText.innerHTML = situationText();
   el.present.innerHTML = presentText();
+  if(el.present2) el.present2.innerHTML = presentText();
   el.party.innerHTML = partyText();
+  if(el.party2) el.party2.innerHTML = partyText();
   el.inv.innerHTML = invText();
-  el.sceneImg.src = LOC[S.location].img(clockHour());
+  if(el.inv2) el.inv2.innerHTML = invText();
+  setTimeImage();
+  setSceneImage();
   renderChars();
+  setPortraitFromPresent();
 }
 
 /* =========================================================
@@ -531,8 +899,29 @@ function addItem(it){
   if(S.inventory.length >= S.invLimit){ pushLog("（所持枠がいっぱいだ）", "danger"); return; }
   S.inventory.push(it);
   pushLog(`（入手：${ITEMS[it]?.name ?? it}）`, "muted");
-}
-function removeItem(it){
+  Media.unlock();
+  Media.sfx("item");
+
+  // 同席キャラの反応（出過ぎないよう確率）
+  if(!S.present?.length) return;
+  if(!chance(45)) return;
+
+  const pick = S.present[rint(S.present.length)];
+  const name = CHAR[pick.id].name;
+
+  const tense = (S.suspect || S.alert>=70 || pick.noticed);
+  const lines = tense ? [
+    `${name}が目を細める。「……それ、どこから？」`,
+    `${name}が一瞬だけ手を止めた。「今の、見なかったことにしないよ」`,
+    `${name}の視線が手元に刺さる。「持ち出し…じゃないよね？」`,
+  ] : [
+    `${name}がちらりと見て、すぐ視線を逸らす。「……資材？」`,
+    `${name}が小さく息を吐く。「必要なら…持っていけば」`,
+    `${name}が肩をすくめる。「急いでるなら、手早くね」`,
+  ];
+
+  pushLog(lines[rint(lines.length)], tense ? "danger" : "muted");
+}function removeItem(it){
   const i=S.inventory.indexOf(it);
   if(i>=0) S.inventory.splice(i,1);
 }
@@ -555,8 +944,10 @@ function isSomeoneNoticed(){
    - “話したのに気づきが戻る”バグ対策済み：既存は noticed 保持
 ========================================================= */
 function locationPool(loc){
-  const all=Object.keys(CHAR);
-  const bias={
+  const all = Object.keys(CHAR);
+
+  // 基本の場所バイアス（重複で重み付け）
+  let bias = ({
     hq:["shigure","asashio","kasumi"],
     radio:["hatsuzuki","shigure","hibiki"],
     workshop:["takao","urakaze","hatsuzuki"],
@@ -571,54 +962,130 @@ function locationPool(loc){
     tunnel:["hibiki","shigure","hatsuzuki"],
     generator:["hatsuzuki","hibiki"],
     warehouse:["kasumi","takao","ikazuchi"],
-  }[loc] || [];
+  }[loc] || []).slice();
+
+  // 時間帯で「人がいる理由」を寄せる
+  const h = clockHour();
+  const ph = phaseOfHour(h);
+
+  // 深夜：居住/食堂/風呂は減り、見張り・埠頭・通路は増える
+  if(ph==="night" && (h>=22 || h<5)){
+    if(["quarters","mess","bath"].includes(loc)) bias = bias.slice(0, Math.max(0, Math.floor(bias.length/3)));
+    if(["watch","dock","yard","tunnel","radio","armory","generator"].includes(loc)){
+      bias.push("asashio","hatsuzuki","hibiki");
+    }
+  }
+
+  // 朝：食堂と工廠が増える（交代/整備/朝食）
+  if(ph==="morning" || ph==="early"){
+    if(["mess","workshop","storage","hq"].includes(loc)){
+      bias.push("urakaze","kongo","takao");
+    }
+  }
+
+  // 夕：資材・浴場が当たりやすい
+  if(ph==="evening"){
+    if(["storage","bath","quarters","warehouse"].includes(loc)){
+      bias.push("kasumi","ikazuchi","urakaze","kongo");
+    }
+  }
+
   return [...bias, ...all, ...bias];
 }
 function calcNoticedChance(){
   const base = 10 + Math.floor(S.alert/8) + (S.suspect?18:0);
   return clamp(base, 5, 70);
 }
-function refreshPresent(force=false){
+function refreshPresent(opts=false){
+  // opts: {force:boolean, keepExisting:boolean}
+  const o = (opts && typeof opts==="object") ? opts : {force:!!opts};
+  const keepExisting = (o.keepExisting !== undefined) ? !!o.keepExisting : true;
+
   const pool = locationPool(S.location);
 
-  // 既存を保持（noticed を維持）
+  // 既存を保持（noticed を維持）※移動時は切る
   const existing = new Map();
-  S.present.forEach(o=>{
-    if(!S.party.includes(o.id)) existing.set(o.id, {id:o.id, noticed:!!o.noticed});
-  });
-
-  let count = chance(55)?2:1;
-  if(force) count = Math.max(1, count);
-
-  const next = [];
-  for(const o of existing.values()){
-    if(next.length>=count) break;
-    next.push({id:o.id, noticed:o.noticed});
+  if(keepExisting){
+    S.present.forEach(x=>{
+      if(!S.party.includes(x.id)) existing.set(x.id, {id:x.id, noticed:!!x.noticed});
+    });
   }
 
-  for(let k=0;k<80 && next.length<count;k++){
+  // 人数：0も出る。危機が進むほど増える。
+  const h = clockHour();
+  const ph = phaseOfHour(h);
+
+  let w0=55, w1=35, w2=10; // 通常は無人多め
+  if(S.alert>=50){ w0=35; w1=50; w2=15; }
+  if(S.alert>=75 || S.suspect){ w0=15; w1=55; w2=30; }
+
+  // 深夜は無人が増えやすい（見張り系ロケだけ逆）
+  if(ph==="night" && (h>=22 || h<5)){
+    if(["watch","dock","yard","tunnel","radio","armory","generator"].includes(S.location)){
+      w0 = Math.max(5, w0-15); w2 = Math.min(45, w2+15);
+    }else{
+      w0 = Math.min(75, w0+10); w2 = Math.max(5, w2-5);
+    }
+  }
+
+  // 抽選
+  const roll = rint(w0+w1+w2);
+  let count = (roll < w0) ? 0 : (roll < w0+w1 ? 1 : 2);
+
+  // force は「再抽選したい」だけ。無人を禁止しない。
+  if(o.force && count===0 && chance(15)) count = 1;
+
+  const next = [];
+
+  // 既存を入れる（その場の連続行動用）
+  for(const x of existing.values()){
+    if(next.length>=count) break;
+    next.push({id:x.id, noticed:x.noticed});
+  }
+
+  // 新規補充
+  for(let k=0;k<120 && next.length<count;k++){
     const id = pool[rint(pool.length)];
     if(S.party.includes(id)) continue;
-    if(next.some(x=>x.id===id)) continue;
+    if(next.some(y=>y.id===id)) continue;
     next.push({id, noticed:false});
   }
 
+  // noticed 抽選（新規だけ）
   const p = calcNoticedChance();
-  next.forEach(o=>{
-    if(existing.has(o.id)) return; // 既存は保持
-    o.noticed = chance(p);         // 新規だけ抽選
+  next.forEach(x=>{
+    if(existing.has(x.id)) return;
+    x.noticed = chance(p);
   });
 
   S.present = next;
 }
 
 function enterLocation(loc){
+  const prev = (S.present||[]).map(o=>o.id);
   S.location = loc;
-  refreshPresent(true);
+  Media.unlock();
+  Media.sfx("enter");
+  Media.updateBgm();
+
+  // 移動時は「居座り」を切って再抽選
+  refreshPresent({force:true, keepExisting:false});
 
   sep();
   pushLog(`—— <b>${LOC[loc].name}</b> ——`);
   pushLog(`<span class="muted">${LOC[loc].situation[rint(LOC[loc].situation.length)]}</span>`);
+
+  // “たまたま行先一緒” の説明ログ
+  const again = S.present.map(o=>o.id).filter(id=>prev.includes(id));
+  if(again.length){
+    const n = again.map(id=>CHAR[id].name).join("、");
+    const lines = [
+      `足音が重なる。……また<span class="muted">${n}</span>の気配だ。`,
+      `巡回が同じ方向に回っているらしい。<span class="muted">${n}</span>が近い。`,
+      `偶然か、意図か――<span class="muted">${n}</span>の視線が離れない。`
+    ];
+    pushLog(lines[rint(lines.length)], "muted");
+  }
 
   if(S.present.length){
     const names = S.present.map(o=>CHAR[o.id].name).join("、");
@@ -651,7 +1118,7 @@ const targetUI = (() => {
     pendingCmd = cmdId;
     const cmd = CMD.find(c=>c.id===cmdId);
     title.textContent = `対象を選択：${cmd.label}`;
-    hint.textContent = cmd.hint;
+    hint.textContent = `${cmd.hint}${cmd.tag?`（${cmd.tag}）`:""}`;
 
     const targets = buildTargets(cmdId);
     grid.innerHTML = targets.map(t=>{
@@ -1100,7 +1567,26 @@ function runCommand(cmdId, targetId){
   targetUI.close();
   if(S.ended) return;
 
+  const _oldH = clockHour();
+  const _oldP = phaseOfHour(_oldH);
+
   S.turn++;
+
+  const _newH = clockHour();
+  const _newP = phaseOfHour(_newH);
+  if(_newP !== _oldP){
+    Media.updateBgm();
+    sep();
+    const msg = ({
+      early: "夜明けが近い。空気が少しだけ軽くなる。",
+      morning: "朝が来た。人の気配が増え始める。",
+      noon: "陽が高い。作業音が遠くで跳ねる。",
+      evening: "夕が沈む。影が長く伸びる。",
+      night: "夜が深まる。波の音が濃くなる。",
+    })[_newP] || "時間が進む…。";
+    pushLog(`<span class="muted">${msg}</span>`);
+    sep();
+  }
 
   // 警戒の基本増減（ざっくり）
   const baseAlert = {
@@ -1133,6 +1619,9 @@ function runCommand(cmdId, targetId){
   // 会話：対象選択した瞬間に NPC台詞をログへ確定 → 返答だけポップアップ
   if(cmdId==="talk" && targetId.startsWith("ch:")){
     const id=targetId.slice(3);
+    Media.unlock();
+    Media.sfx("talk");
+    setPortrait(id);
     return CmdTalk.start(id, {noticed:true}, afterStep);
   }
 
@@ -1776,13 +2265,18 @@ function newGame(keepSeed=false){
   pushLog("—— <b>離島鎮守府</b> ——");
   pushLog("夜の潮が重い。ここを抜け、本土へ辿り着け。<br><span class='muted'>（航路/鍵/整備/封鎖解除 → 埠頭で出港）</span>");
   enterLocation("hq");
+  Media.updateBgm();
   renderTop();
 }
 
 function buildCmdButtons(){
-  el.cmdGrid.innerHTML = CMD.map(c=>`<button data-c="${c.id}">${c.label}</button>`).join("");
+  el.cmdGrid.innerHTML = CMD.map(c=>{
+    const tag = c.tag ? `<span class="tag">${c.tag}</span>` : "";
+    const title = (c.hint||"").replace(/"/g,"&quot;");
+    return `<button data-c="${c.id}" title="${title}">${c.label}${tag}</button>`;
+  }).join("");
   el.cmdGrid.querySelectorAll("button").forEach(b=>{
-    b.onclick=()=>targetUI.open(b.dataset.c);
+    b.onclick=()=>{ Media.unlock(); Media.sfx("click"); targetUI.open(b.dataset.c); };
   });
 }
 
@@ -2437,16 +2931,80 @@ const Dialogue = (() => {
     const suspect = S.suspect;
     const noticed = !!context.noticed;
 
-    return ({
-      asashio: suspect ? "朝潮「提督。行動理由を確認します」" : (noticed?"朝潮「提督。こんな時間に？」":"朝潮「……気配が…」"),
-      kasumi:  suspect ? "霞「はぁ？また逃げる気？」" : (noticed?"霞「今夜は落ち着きないわね」":"霞「……誰かいるの？」"),
-      takao:   suspect ? "高雄「提督。動きが不自然です。説明を」" : (noticed?"高雄「提督。お疲れですか」":"高雄「……そこですか？」"),
-      kongo:   suspect ? "金剛「提督！Stop！どこ行くのネ！」" : (noticed?"金剛「Hey提督！眠れない？」":"金剛「誰かいるヨ！」"),
-      hatsuzuki:suspect ? "初月「提督。目的を言え」" : (noticed?"初月「提督。行動が多い」":"初月「……誰だ」"),
-      urakaze: suspect ? "浦風「提督…無茶したらいけんよ」" : (noticed?"浦風「提督、寒うない？」":"浦風「…提督？」"),
-      ikazuchi:suspect ? "雷「提督！待って！どこ行くの！？」" : (noticed?"雷「提督、どうしたの？」":"雷「えっ、誰？」"),
-      hibiki:  suspect ? "響「……止まれ」" : (noticed?"響「……夜だ」":"響「……気配」"),
-    })[id] || "……";
+    
+    const c = S.chars[id] || {trust:50,intimacy:0,name:CHAR[id]?.name||id};
+    const trust = c.trust||0;
+    const intimacy = c.intimacy||0;
+
+    const tier = trust>=80 ? "high" : trust>=60 ? "mid" : "low";
+    const base = (lines)=>lines[rint(lines.length)];
+
+    // 疑念がない通常
+    if(!suspect){
+      const pack = {
+        asashio:{
+          low:["朝潮「……何か用ですか」","朝潮「提督。夜更かしは良くありません」"],
+          mid:["朝潮「提督。巡回ですか」","朝潮「提督。気をつけてくださいね」"],
+          high:["朝潮「提督。……少し、顔が疲れて見えます」","朝潮「提督。無理は、しないで」"],
+        },
+        kasumi:{
+          low:["霞「はぁ？まだ起きてんの？」","霞「…うるさくしないでよ」"],
+          mid:["霞「夜に動くなら、足音くらい消しな」","霞「……用がないなら行きな」"],
+          high:["霞「…変なことしてないでしょうね」","霞「……まあ、気をつけな」"],
+        },
+        takao:{
+          low:["高雄「提督。規律は守ってください」","高雄「……その手、何を持っています？」"],
+          mid:["高雄「提督。見回りなら私も把握しておきます」","高雄「夜の移動は控えめに」"],
+          high:["高雄「提督。休憩も任務のうちです」","高雄「…何かあれば言ってください」"],
+        },
+        kongo:{
+          low:["金剛「Hey提督！何してるノ？」","金剛「夜はDangerだヨ！」"],
+          mid:["金剛「提督、眠れない？ Teaでも飲む？」","金剛「巡回なら、私も付き合うヨ」"],
+          high:["金剛「提督！元気ないネ？抱え込むのダメ！」","金剛「ね、少しだけ話そ？」"],
+        },
+        hatsuzuki:{
+          low:["初月「……誰だ」","初月「提督。静かにしろ」"],
+          mid:["初月「提督。夜の行動は記録する」","初月「不用意に動くな」"],
+          high:["初月「提督。……寝ないのか」","初月「無理は…するな」"],
+        },
+        urakaze:{
+          low:["浦風「…提督？どうしたん」","浦風「夜風、冷えとるよ」"],
+          mid:["浦風「提督、歩くなら気ぃつけんさい」","浦風「眠れんの？」"],
+          high:["浦風「提督、顔色がよぉない」","浦風「……無理して笑わんでええよ」"],
+        },
+        ikazuchi:{
+          low:["雷「えっ、誰？」","雷「提督？起きてたの？」"],
+          mid:["雷「提督、どうしたの？眠れない？」","雷「夜の見回りなら一緒に行く！」"],
+          high:["雷「提督、元気ないの？」","雷「…雷がついててあげる！」"],
+        },
+        hibiki:{
+          low:["響「……気配」","響「……夜だ」"],
+          mid:["響「提督。眠れないのか」","響「……静かに」"],
+          high:["響「提督。…無理はしない」","響「……大丈夫。ここにいる」"],
+        },
+      };
+      const lines = (pack[id] && pack[id][tier]) ? pack[id][tier] : ["……"];
+      // noticed（互いに把握済み）だと一言だけ角が取れる
+      if(noticed && tier==="low" && chance(35)) return `${c.name}「……提督」`;
+      // 親密が高いと少し柔らかく
+      if(intimacy>=50 && tier!=="low" && chance(25)) return `${c.name}「……近いね」`;
+      return base(lines);
+    }
+
+    // 疑念あり
+    const doubtPack = {
+      asashio:["朝潮「提督。行動理由を確認します」","朝潮「提督。記録に残します」"],
+      kasumi:["霞「はぁ？また逃げる気？」","霞「……変な真似したら殴るわよ」"],
+      takao:["高雄「提督。動きが不自然です。説明を」","高雄「提督。ここで止まりましょう」"],
+      kongo:["金剛「提督！Stop！どこ行くのネ！」","金剛「提督、説明してヨ！」"],
+      hatsuzuki:["初月「提督。目的を言え」","初月「……止まれ」"],
+      urakaze:["浦風「提督…無茶したらいけんよ」","浦風「…ほんまに大丈夫？」"],
+      ikazuchi:["雷「提督！待って！どこ行くの！？」","雷「提督、隠し事？」"],
+      hibiki:["響「……止まれ」","響「……話せ」"],
+    };
+    const d = doubtPack[id] || ["……"];
+    return base(d);
+
   }
 
   function options(id, context){
@@ -2610,6 +3168,38 @@ function wireMenu(){
     enterLocation("hq");
     renderTop();
   };
+
+  // BGM / SE
+  const btnBgm = document.getElementById("btnBgmToggle");
+  const btnSfx = document.getElementById("btnSfxToggle");
+  const bgmVol = document.getElementById("bgmVol");
+  const sfxVol = document.getElementById("sfxVol");
+
+  if(btnBgm){
+    btnBgm.textContent = `BGM：${Media.state.bgmOn ? "ON" : "OFF"}`;
+    btnBgm.onclick=()=>{
+      Media.unlock();
+      const on = Media.toggleBgm();
+      btnBgm.textContent = `BGM：${on ? "ON" : "OFF"}`;
+    };
+  }
+  if(btnSfx){
+    btnSfx.textContent = `SE：${Media.state.sfxOn ? "ON" : "OFF"}`;
+    btnSfx.onclick=()=>{
+      const on = Media.toggleSfx();
+      btnSfx.textContent = `SE：${on ? "ON" : "OFF"}`;
+      if(on) Media.sfx("click");
+    };
+  }
+  if(bgmVol){
+    bgmVol.value = Math.round(Media.state.bgmVol*100);
+    bgmVol.oninput=()=>Media.setBgmVol((+bgmVol.value)/100);
+  }
+  if(sfxVol){
+    sfxVol.value = Math.round(Media.state.sfxVol*100);
+    sfxVol.oninput=()=>Media.setSfxVol((+sfxVol.value)/100);
+  }
+
   menuWrap.addEventListener("click",(e)=>{ if(e.target.id==="menuWrap") menuWrap.classList.remove("show"); });
 }
 
