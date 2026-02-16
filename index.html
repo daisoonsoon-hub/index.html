@@ -92,6 +92,32 @@
   .scenePortrait .nm{font-weight:900;margin-bottom:4px}
   .scenePortrait .tx{color:rgba(255,255,255,.84);line-height:1.45}
 
+  /* Multi-portrait lane */
+  .scenePortrait{pointer-events:none}
+  .scenePortrait .portraitsLane{display:flex;gap:10px;align-items:flex-end;flex:0 0 auto;pointer-events:auto}
+  .scenePortrait .pCard{
+    width:120px;height:170px;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.14);
+    background:rgba(0,0,0,.35);position:relative;cursor:pointer;pointer-events:auto;
+    transform-origin:bottom left;
+  }
+  .scenePortrait .pCard img{width:100%;height:100%;object-fit:cover;display:block}
+  .scenePortrait .pCard .lbl{
+    position:absolute;left:8px;right:8px;bottom:8px;
+    display:flex;gap:6px;align-items:center;justify-content:space-between;
+    font-size:12px;font-weight:900;text-shadow:0 2px 10px rgba(0,0,0,.65);
+  }
+  .scenePortrait .pCard .dist{
+    font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;
+    background:rgba(12,14,20,.70);border:1px solid rgba(255,255,255,.14);
+    color:rgba(255,255,255,.85)
+  }
+  .scenePortrait .pCard.near{transform:scale(1.10)}
+  .scenePortrait .pCard.mid{transform:scale(0.95);opacity:.92}
+  .scenePortrait .pCard.far{transform:scale(0.82);opacity:.82}
+  .scenePortrait .pCard.focus{outline:2px solid rgba(105,192,255,.70)}
+  .scenePortrait .bubble{pointer-events:auto}
+
+
   @media (max-width: 980px){
     .uiRow{flex-direction:column}
     .leftCol{max-width:none}
@@ -159,7 +185,7 @@
             <div class="sceneShade"></div>
 
             <div class="scenePortrait" id="portraitRow" style="display:none">
-              <div class="portraitBox"><img alt="portrait" id="charPortrait"/></div>
+              <div class="portraitsLane" id="stagePortraits"></div>
               <div class="bubble">
                 <div class="nm" id="charPortraitName">—</div>
                 <div class="tx" id="charPortraitFlavor">—</div>
@@ -640,7 +666,8 @@ const el = {
   timeLabel: document.getElementById("timeLabel"),
   sceneImg: document.getElementById("sceneImg"),
   portraitRow: document.getElementById("portraitRow"),
-  charPortrait: document.getElementById("charPortrait"),
+  stagePortraits: document.getElementById("stagePortraits"),
+  stagePortraits: document.getElementById("stagePortraits"),
   charPortraitName: document.getElementById("charPortraitName"),
   charPortraitFlavor: document.getElementById("charPortraitFlavor"),
   chars: document.getElementById("chars"),
@@ -711,65 +738,290 @@ function trustTier(c){
   if(t>=60) return "mid";
   return "low";
 }
-function pickPortraitExpr(id){
-  const c=S.chars[id];
-  const tier=trustTier(c);
-  if(S.suspect) return "suspicious";
-  if(c.intimacy>=60 && tier!=="low") return "intimate";
-  if(tier==="high") return "friendly";
-  if(tier==="mid") return "neutral";
-  return "cold";
-}
-function portraitFlavorText(id){
-  const c=S.chars[id];
-  const tier=trustTier(c);
-  const loc = locCanon(S.location);
-  const locName = LOC[S.location].name;
-  const base = {
-    low:`${locName}で、視線が少しだけ硬い。`,
-    mid:`${locName}で、距離はあるが話は通る。`,
-    high:`${locName}で、空気が柔らかい。`,
-  }[tier];
-  if(S.suspect) return `${locName}で、言葉が短い。疑いが混じる。`;
-  if(c.intimacy>=60 && c.trust>=70) return `${locName}で、目が笑っている。`;
-  return base;
-}
-function setPortrait(id){
-  if(!id || !S.chars[id]){
-    el.portraitRow.style.display="none";
-    return;
+/* =========================================================
+   STAGE PORTRAITS (multi) + encounter state
+   - Present chars are shown on the scene as multiple portraits
+   - Each "meeting" rolls a random portrait from aware/unaware pools
+   - When a char leaves present, the meeting is cleared; re-meeting rerolls
+========================================================= */
+const PORTRAIT_POOLS = {
+  // location id -> pools (keys are filenames without extension)
+  // You can extend freely: "./images/chars/<id>/<key>.png|webp"
+  // If missing, it falls back to neutral.*
+  default: {
+    unaware: ["unaware1","unaware2","neutral","cold"],
+    aware: ["aware1","aware2","neutral","suspicious","friendly","intimate"]
+  },
+  bath: { // 浴場
+    unaware: ["bath_unaware1","bath_unaware2","unaware1","neutral"],
+    aware: ["bath_aware1","bath_aware2","aware1","friendly","suspicious"]
+  },
+  storage: { // 資材庫
+    unaware: ["storage_unaware1","storage_unaware2","unaware1","neutral"],
+    aware: ["storage_aware1","storage_aware2","aware1","suspicious","friendly"]
   }
-  const c=S.chars[id];
-  el.portraitRow.style.display="flex";
-  el.charPortraitName.textContent = c.name;
-  el.charPortraitFlavor.textContent = portraitFlavorText(id);
+};
 
-  const expr = pickPortraitExpr(id);
-  const base = `./images/chars/${id}/`;
-  const candidates = [
-    `${base}${expr}.webp`,
-    `${base}${expr}.png`,
+function locPoolKey(locId){
+  const canon = locCanon(locId);
+  // try direct id first, then canon, then default
+  return PORTRAIT_POOLS[locId] ? locId : (PORTRAIT_POOLS[canon] ? canon : "default");
+}
+
+function rollAware(charId){
+  // "気づいてない/気づいてる" をふわっと決める。疑念や警戒が高いと気づきやすい。
+  const base = S.suspect ? 70 : 30;
+  const a = clamp(S.alert||0, 0, 100);
+  const bump = Math.floor(a/25) * 8; // 0,8,16,24,32
+  const p = clamp(base + bump, 15, 90);
+  return chance(p);
+}
+
+function rollDist(aware){
+  // 近さ演出。気づいてる方が近寄りやすい。
+  const r = rnd(100);
+  if(aware){
+    if(r<40) return "near";
+    if(r<80) return "mid";
+    return "far";
+  }else{
+    if(r<20) return "near";
+    if(r<70) return "mid";
+    return "far";
+  }
+}
+
+function pickFrom(arr, fallback){
+  if(!arr || !arr.length) return fallback;
+  return arr[rndi(0, arr.length-1)];
+}
+
+function pickMeetingPose(charId, aware){
+  const key = locPoolKey(S.location);
+  const pools = PORTRAIT_POOLS[key] || PORTRAIT_POOLS.default;
+  const list = aware ? pools.aware : pools.unaware;
+
+  // trust tierで「それっぽい」方に寄せる（ポーズ寄せ）
+  const c = S.chars[charId];
+  const tier = trustTier(c);
+  if(tier==="high" && chance(55)) return pickFrom(list.filter(x=>/friendly|intimate|aware/i.test(x)), pickFrom(list,"neutral"));
+  if(tier==="low"  && chance(55)) return pickFrom(list.filter(x=>/cold|suspicious/i.test(x)), pickFrom(list,"neutral"));
+  return pickFrom(list, "neutral");
+}
+
+const FACE_POOLS = {
+  // 表情は「ポーズ固定のまま、表情だけ揺らす」ための候補
+  default: {
+    unaware: ["neutral","blink","side","sleepy","cold"],
+    aware: ["neutral","blink","smile","annoyed","suspicious","friendly"]
+  }
+};
+
+function pickMeetingFace(charId, aware){
+  const pools = FACE_POOLS.default;
+  const list = aware ? pools.aware : pools.unaware;
+
+  const c = S.chars[charId];
+  const tier = trustTier(c);
+  if(aware && tier==="high" && chance(55)) return pickFrom(list.filter(x=>/smile|friendly/i.test(x)), pickFrom(list,"neutral"));
+  if(aware && tier==="low"  && chance(55)) return pickFrom(list.filter(x=>/annoyed|suspicious|cold/i.test(x)), pickFrom(list,"neutral"));
+  return pickFrom(list, "neutral");
+}
+
+function ensureMeetState(){
+  if(!S.meet) S.meet = {}; // charId -> {loc, aware, dist, pose, face}
+  const now = new Set((S.present||[]).map(o=>o.id));
+
+  // clear those who are no longer present
+  for(const id of Object.keys(S.meet)){
+    if(!now.has(id)) delete S.meet[id];
+  }
+
+  // add/refresh those present (new meeting or location changed => reroll pose + initial face)
+  for(const o of (S.present||[])){
+    const id = o.id;
+    const prev = S.meet[id];
+    if(!prev || prev.loc !== S.location){
+      const aware = rollAware(id);
+      const pose = pickMeetingPose(id, aware);
+      S.meet[id] = {
+        loc: S.location,
+        aware,
+        dist: rollDist(aware),
+        pose,
+        face: pickMeetingFace(id, aware),
+      };
+    }
+  }
+
+  // focus default
+  if(S.focus && !now.has(S.focus)) S.focus = "";
+  if(!S.focus && (S.present||[]).length) S.focus = S.present[0].id;
+}
+
+
+function setMeetAware(charId, aware){
+  if(!S.meet || !S.meet[charId]) return;
+  const m = S.meet[charId];
+  if(m.aware === aware) return;
+  m.aware = aware;
+  // 気づいた瞬間に「気づいてる側テーブル」でポーズを引き直す
+  if(aware){
+    m.pose = pickMeetingPose(charId, true);
+    m.dist = rollDist(true);
+  }else{
+    m.pose = pickMeetingPose(charId, false);
+    m.dist = rollDist(false);
+  }
+  m.face = pickMeetingFace(charId, aware);
+}
+
+function bumpMeetOnAction(cmdId, targetId){
+  ensureMeetState();
+  if(!S.meet) return;
+
+  const noisy = ["talk","touch","order","run","open","close","steal","use"].includes(cmdId);
+  const a = clamp(S.alert||0, 0, 100);
+  for(const id of Object.keys(S.meet)){
+    const m = S.meet[id];
+    if(!m) continue;
+
+    // 未察知 → きっかけで察知へ
+    if(!m.aware){
+      const targeted = (id===targetId) || (id===S.focus);
+      const base = 6;
+      const p = clamp(base + (noisy?18:0) + Math.floor(a/10) + (S.suspect?15:0) + (targeted?10:0), 2, 85);
+      if(chance(p)){
+        setMeetAware(id, true);
+      }
+    }
+
+    // 表情は頻繁に揺らす（固定顔の怖さ対策）
+    const focus = (id===S.focus) || (id===targetId);
+    const changeP = focus ? 65 : 28;
+    if(chance(changeP)){
+      m.face = pickMeetingFace(id, m.aware);
+    }
+  }
+}
+function portraitCandidates(charId, pose, face){
+  const base = `./images/chars/${charId}/`;
+  // 1) pose + face (同じポーズのまま表情だけ差し替え)
+  // 2) pose 単体 (表情差分が無い場合のフォールバック)
+  // 3) neutral
+  const pf = face ? `${pose}_${face}` : pose;
+  return [
+    `${base}${pf}.webp`,
+    `${base}${pf}.png`,
+    `${base}${pose}.webp`,
+    `${base}${pose}.png`,
     `${base}neutral.webp`,
     `${base}neutral.png`,
   ];
+}
+
+function setImgWithFallback(imgEl, urls){
   let k=0;
-  const img = el.charPortrait;
-  const tryNext = ()=>{
-    if(k>=candidates.length){
-      img.removeAttribute("src");
+  const tryNext=()=>{
+    if(k>=urls.length){
+      imgEl.removeAttribute("src");
+      imgEl.style.visibility="hidden";
       return;
     }
-    img.src = candidates[k++];
+    const u=urls[k++];
+    const t=new Image();
+    t.onload=()=>{ imgEl.src=u; imgEl.style.visibility="visible"; };
+    t.onerror=tryNext;
+    t.src=u;
   };
-  img.onerror = tryNext;
   tryNext();
 }
-function setPortraitFromPresent(){
-  if(S.present && S.present.length){
-    setPortrait(S.present[0].id);
-  }else{
+
+function focusFlavorText(){
+  const id = S.focus;
+  if(!id || !S.chars[id]) return "—";
+  const c = S.chars[id];
+  const tier=trustTier(c);
+  const locN = LOC[S.location]?.name || S.location;
+  const m = (S.meet && S.meet[id]) ? S.meet[id] : null;
+
+  const aware = m ? m.aware : false;
+  const dist = m ? m.dist : "mid";
+
+  const distTxt = dist==="near" ? "近い" : (dist==="far" ? "遠い" : "ほどよい距離");
+  const awareTxt = aware ? "気づいている" : "気づいてない";
+  const mood =
+    tier==="low" ? "空気が固い。" :
+    tier==="mid" ? "様子見の間合い。" :
+    "呼吸が合ってきた。";
+
+  return `${locN}。${awareTxt}。距離は${distTxt}。${mood}`;
+}
+
+function renderStagePortraits(){
+  ensureMeetState();
+
+  const present = (S.present||[]).map(o=>o.id);
+  if(!present.length){
     el.portraitRow.style.display="none";
+    return;
   }
+  el.portraitRow.style.display="flex";
+
+  // bubble uses focus
+  const fid = S.focus || present[0];
+  if(fid && S.chars[fid]){
+    el.charPortraitName.textContent = S.chars[fid].name;
+    el.charPortraitFlavor.textContent = focusFlavorText();
+  }else{
+    el.charPortraitName.textContent = "—";
+    el.charPortraitFlavor.textContent = "—";
+  }
+
+  // build lane
+  el.stagePortraits.innerHTML="";
+  for(const id of present){
+    const c = S.chars[id];
+    const m = S.meet?.[id];
+    const dist = m?.dist || "mid";
+    const pose = m?.pose || "neutral";
+    const face = m?.face || "";
+
+    const card = document.createElement("div");
+    card.className = `pCard ${dist}` + (id===fid ? " focus":"");
+    card.title = `${c.name}（${dist==="near"?"近い":dist==="far"?"遠い":"中距離"} / ${m?.aware?"気づいてる":"気づいてない"}）`;
+    card.dataset.id = id;
+
+    const img = document.createElement("img");
+    img.alt = c.name;
+    img.style.visibility="hidden";
+    setImgWithFallback(img, portraitCandidates(id, pose, face));
+
+    const lbl = document.createElement("div");
+    lbl.className="lbl";
+    const nm = document.createElement("div");
+    nm.textContent = c.name;
+    const dd = document.createElement("div");
+    dd.className="dist";
+    dd.textContent = dist==="near" ? "近い" : (dist==="far" ? "遠い" : "中");
+    lbl.appendChild(nm);
+    lbl.appendChild(dd);
+
+    card.appendChild(img);
+    card.appendChild(lbl);
+
+    card.addEventListener("click",(ev)=>{
+      ev.stopPropagation();
+      S.focus = id;
+      renderStagePortraits();
+    });
+
+    el.stagePortraits.appendChild(card);
+  }
+}
+
+function setPortraitFromPresent(){
+  renderStagePortraits();
 }
 
 
@@ -1567,6 +1819,9 @@ function runCommand(cmdId, targetId){
   targetUI.close();
   if(S.ended) return;
 
+  S.lastCmdId = cmdId;
+  S.lastTargetId = targetId || "";
+
   const _oldH = clockHour();
   const _oldP = phaseOfHour(_oldH);
 
@@ -1621,7 +1876,8 @@ function runCommand(cmdId, targetId){
     const id=targetId.slice(3);
     Media.unlock();
     Media.sfx("talk");
-    setPortrait(id);
+    S.focus=id;
+    renderStagePortraits();
     return CmdTalk.start(id, {noticed:true}, afterStep);
   }
 
@@ -2143,6 +2399,9 @@ function endGame(id){
 function afterStep(){
   // 出現入れ替え（頻度は低め）
   if(chance(18)) refreshPresent(true);
+
+  // 行動に応じて「気づく」＆ 表情ゆらぎ
+  bumpMeetOnAction(S.lastCmdId||"", S.lastTargetId||"");
 
   captureCheck();
   pressureCheck();
