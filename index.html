@@ -157,25 +157,64 @@
   .portraitsLane .sprite.focus{filter: drop-shadow(0 12px 22px rgba(0,0,0,.70));opacity:1}
 
 
+/* === Layout hardening: keep left/mid/right in one row === */
+.appRow{
+  display:grid !important;
+  grid-template-columns: 320px minmax(0,1fr) 420px !important;
+  gap:12px !important;
+  align-items:stretch !important;
+}
+@media (max-width: 1200px){
+  .appRow{ grid-template-columns: 300px minmax(0,1fr) 380px !important; }
+}
+@media (max-width: 1024px){
+  .appRow{ grid-template-columns: 280px minmax(0,1fr) 340px !important; }
+}
+/* Allow middle to scroll horizontally if needed instead of wrapping columns */
+.midCol{ min-width:0 !important; }
 
-/* --- Layout lock: keep right column on the right (no wrap) --- */
-.uiRow{flex-wrap:nowrap;align-items:stretch}
-.uiRow>.col{min-width:0}
-.uiRow>.leftCol{flex:0 0 320px}
-.uiRow>.rightCol{flex:0 0 440px}
-.uiRow>.centerCol{flex:1 1 auto}
 
-/* --- Mid HUD: location name lives here --- */
-.midLine{display:flex;gap:10px;align-items:center}
-.midPlace{flex:0 0 auto;min-width:72px;padding:6px 10px;border-radius:999px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.12);font-weight:700}
-.midText{flex:1 1 auto}
-#placeName{opacity:.25;font-weight:600}
+.placeInline{
+  display:inline-block;
+  padding:2px 8px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(0,0,0,.25);
+  font-weight:700;
+  letter-spacing:.02em;
+  margin-right:6px;
+}
+.sep{ opacity:.6; margin-right:6px; }
 
-/* --- Portraits: anchor to bottom; keep feet at the floor --- */
-.locStage{position:relative}
-.scenePortrait{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;pointer-events:none}
-.portraitsLane{width:100%;height:100%;display:flex;gap:18px;align-items:flex-end;justify-content:center;padding:0 18px 0 18px}
-.portraitsLane img{max-height:100%;height:100%;width:auto;object-fit:contain;object-position:center bottom;display:block}
+
+#placeNameTop{ display:none !important; }
+
+
+/* Make a little breathing room for the place badge inside the situation bar */
+#situationText{ padding-left:4px; }
+
+
+/* === Portrait anchoring: always cut at bottom, not at head === */
+.stagePortrait{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  overflow:hidden; /* clip at stage bounds */
+}
+.stagePortrait img{
+  position:absolute;
+  bottom:0;
+  left:50%;
+  transform:translateX(-50%);
+  max-height:100%;
+  max-width:100%;
+  height:auto;
+  width:auto;
+  object-fit:contain;
+  object-position:center bottom;
+  filter: drop-shadow(0 10px 25px rgba(0,0,0,.55));
+}
+
 </style>
 </head>
 <body>
@@ -208,7 +247,7 @@
       </div>
     </div>
 
-    <div class="col centerCol">
+    <div class="col">
       <div class="card stageCard">
         <div class="hd">
           <div class="h" id="placeName">—</div>
@@ -219,7 +258,7 @@
 
           <div class="midHud">
             <div class="midLine">
-              <div class="midPlace" id="placeInline">—</div>
+              <div class="midLabel"><span class="placeInline" id="placeNameHud">—</span><span class="sep">／</span><span>現在地の状況</span></div>
               <div class="midText" id="situationText">—</div>
               <div class="chip smallTag" id="suspectTagInline" style="display:none"></div>
             </div>
@@ -243,7 +282,7 @@
       </div>
     </div>
 
-    <div class="col rightCol" style="max-width:440px">
+    <div class="col" style="max-width:440px">
       <div class="card">
         <div class="hd"><div class="h">コマンド</div><div class="small muted">押す→対象選択</div></div>
         <div class="bd"><div class="grid3" id="cmdGrid"></div></div>
@@ -501,13 +540,4 @@ function paletteForHour(h){
   // 空の色（上→下）
   const p = phaseOfHour(h);
   if(p==="early")   return {skyA:"#13224a", skyB:"#ffb37a", haze:"#ffd7b0", star:0.20, sun:0.35, moon:0.70};
-  if(p==="morning") return {skyA:"#4b8bd6", skyB:"#bfe6ff", haze:"#ffffff", star:0.06, sun:0.90, moon:0.15};
-  if(p==="noon")    return {skyA:"#2b79e6", skyB:"#b8e5ff", haze:"#ffffff", star:0.00, sun:1.00, moon:0.00};
-  if(p==="evening") return {skyA:"#2a2d6e", skyB:"#ff7b61", haze:"#ffd0c2", star:0.10, sun:0.55, moon:0.35};
-  // night
-  return {skyA:"#060a16", skyB:"#111a2f", haze:"#8fb6ff", star:0.55, sun:0.00, moon:1.00};
-}
-function clamp01(x){ return Math.max(0, Math.min(1, x)); }
-function lerp(a,b,t){ return a + (b-a)*t; }
-
-function sunMoonF
+  if(p==="morning") return {skyA:"#4b8bd6", skyB:"#bfe6ff", haze:"#ffffff", star:0.06, sun:0.
